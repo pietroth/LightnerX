@@ -142,6 +142,6 @@ A biblioteca não exige uma quantidade específica de threads nem um intervalo f
 
 ## Próximos passos
 
-- Consulte [Comunicação e protocolo INER](comunicacao.md) para entender os cabeçalhos e os papéis semânticos.
+- Consulte [Comunicação e protocolo INER](communication.md) para entender os cabeçalhos e os papéis semânticos.
 - Consulte [Referência da API](api.md) para os componentes de rede, mensagens e batcher.
 - Use `notification2OutboundMessage`, `event2OutboundMessage`, `intention2OutboundMessage`, `response2OutboundMessage` e `unsuccessfulResponse2OutboundMessage` para montar mensagens de saída.
