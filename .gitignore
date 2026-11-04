@@ -32,6 +32,7 @@ build.ninja
 # IDE
 .idea/
 .vscode/
+.zed/
 
 # OS
 .DS_Store
