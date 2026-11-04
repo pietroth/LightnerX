@@ -9,12 +9,12 @@ set(NETWORK_MODULES
 )
 
 if(NETWORK_SOURCES)
-    target_sources(LightnerX PRIVATE ${NETWORK_SOURCES})
+    target_sources(LightnerX PUBLIC ${NETWORK_SOURCES})
 endif()
 
 if(NETWORK_MODULES)
     target_sources(LightnerX
-        PRIVATE
+        PUBLIC
             FILE_SET CXX_MODULES
         BASE_DIRS "${PROJECT_SOURCE_DIR}"
         FILES ${NETWORK_MODULES}
