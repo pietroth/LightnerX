@@ -244,4 +244,25 @@ export namespace communication {
 
         return {message, hConn};
     }
+
+    network::OutboundMessage notification2OutboundMessage(
+        const communication::Notification& notification,
+        const std::span<const std::byte> payload,
+        HSteamNetConnection hConn
+    ) {
+        const auto size = sizeof(notification) + payload.size();
+        auto* message = SteamNetworkingUtils()->AllocateMessage(static_cast<int>(size));
+
+        std::memcpy(message->m_pData, &notification, sizeof(notification));
+
+        if (!payload.empty()) {
+            std::memcpy(
+                static_cast<std::byte*>(message->m_pData) + sizeof(notification),
+                payload.data(),
+                payload.size()
+            );
+        }
+
+        return {message, hConn};
+    }
 }
