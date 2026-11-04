@@ -1,98 +1,242 @@
 module;
-#define ENET_IMPLEMENTATION
-#include <functional>
-#include <vector>
+
+#include "steam/isteamnetworkingsockets.h"
+#include "steam/steamnetworkingtypes.h"
+#include <steam/steamnetworkingsockets.h>
+#include <steam/isteamnetworkingutils.h>
+
+#include <cstdint>
 #include <cstddef>
 #include <expected>
-#include <system_error>
-#include <cstdint>
-#include "enet.h"
-#include <iostream>
+#include <functional>
 #include <print>
+#include <system_error>
+#include <vector>
 
 export module network.server;
 
+import network.network_manager;
+
 export namespace network {
+    constexpr HSteamListenSocket k_invalidSocket = 0;
+    constexpr HSteamNetPollGroup k_invalidPollGroup = 0;
+
     class Server {
     private:
-        int port;
-        int peerCount;
-        int channelLimit;
+        ISteamNetworkingSockets* m_pInterface = nullptr;
+        HSteamListenSocket m_hListenSocket = k_invalidSocket;
+        HSteamNetPollGroup m_hPollGroup = k_invalidPollGroup;
 
-        using ClientConnectedCallback = std::function<void()>;
+        using ClientConnectedCallback = std::function<void(HSteamNetConnection)>;
         std::vector<ClientConnectedCallback> clientConnectedCallbacks;
 
-    public:
-        Server(int port, int peerCount, int channelLimit)
-        :   port(port), peerCount(peerCount), channelLimit(channelLimit) {}
+        using ClientDisconnectedCallback = std::function<void(HSteamNetConnection)>;
+        std::vector<ClientDisconnectedCallback> clientDisconnectedCallbacks;
 
-        void addClientConnectListener(ClientConnectedCallback callback) {
+        using ClientReceivedMessageCallback = std::function<void(std::span<const std::byte>, HSteamNetConnection)>;
+        std::vector<ClientReceivedMessageCallback> clientReceivedMessageCallbacks;
+
+    public:
+        void addClientConnectedCallback(ClientConnectedCallback callback) {
             clientConnectedCallbacks.push_back(callback);
         }
 
-        std::expected<void, std::error_code> run() {
-            if (enet_initialize() != 0) {
-                std::println(std::cerr, "An error occurred while initializing ENet.");
-                return std::unexpected(std::make_error_code(std::errc::io_error));
+        void addClientDisconnectedCallback(ClientDisconnectedCallback callback) {
+            clientDisconnectedCallbacks.push_back(callback);
+        }
+
+        void addClientReceivedMessageCallback(ClientReceivedMessageCallback callback) {
+            clientReceivedMessageCallbacks.push_back(callback);
+        }
+
+        std::expected<void, std::error_code> start(int port, uint32_t timeoutConnected) {
+            if (!network::networkInit()) {
+                return std::unexpected(
+                    std::make_error_code(std::errc::io_error)
+                );
             }
 
-            ENetAddress address;
-            address.host = ENET_HOST_ANY;
-            address.port = port;
+            m_pInterface = SteamNetworkingSockets();
 
-            ENetHost* server = enet_host_create(&address, peerCount, channelLimit, 0, 0);
-            if (server == nullptr) {
-                std::println(std::cerr, "Error creating server.");
+            SteamNetworkingIPAddr address;
+            address.Clear();
+            address.m_port = port;
+
+            s_pCallbackInstance = this;
+
+            SteamNetworkingConfigValue_t options[2];
+
+            options[0].SetPtr(
+                k_ESteamNetworkingConfig_Callback_ConnectionStatusChanged,
+                reinterpret_cast<void*>(SteamNetConnectionStatusChangedCallback)
+            );
+
+            options[1].SetInt32(
+                k_ESteamNetworkingConfig_TimeoutConnected,
+                timeoutConnected
+            );
+
+            m_hListenSocket = m_pInterface->CreateListenSocketIP(
+                address,
+                2,
+                options
+            );
+
+            if (m_hListenSocket == k_invalidSocket) {
+                s_pCallbackInstance = nullptr;
+                GameNetworkingSockets_Kill();
+
+                std::println(stderr, "Failed to create listen socket.");
                 return std::unexpected(std::make_error_code(std::errc::resource_unavailable_try_again));
             }
 
-            std::println("Server started on port {}", address.port);
+            m_hPollGroup = m_pInterface->CreatePollGroup();
 
-            ENetEvent event;
+            if (m_hPollGroup == k_invalidPollGroup) {
+                s_pCallbackInstance = nullptr;
+                m_pInterface->CloseListenSocket(m_hListenSocket);
+                GameNetworkingSockets_Kill();
 
-            while (true) {
-                while (enet_host_service(server, &event, 15)) {
-                    switch (event.type) {
-                        case ENET_EVENT_TYPE_CONNECT: {
-                            auto raw_rost = *reinterpret_cast<const uint32_t*>(&event.peer->address.host);
-                            std::println("Client connected from {:x}:{}", raw_rost, event.peer->address.port);
+                std::println(stderr, "Failed to create poll group.");
+                return std::unexpected(std::make_error_code(std::errc::resource_unavailable_try_again));
+            }
 
-                            for (const auto& callback : clientConnectedCallbacks) {
-                                if (callback) {
-                                    callback();
-                                }
-                            }
+            return {};
+        }
 
-                            break;
-                        }
-                        case ENET_EVENT_TYPE_RECEIVE: {
-                            std::print("Message received. Lenght: {}. Data:", event.packet->dataLength);
+        std::expected<void, std::error_code> update() {
+            m_pInterface->RunCallbacks();
 
-                            for (size_t i = 0; i < event.packet->dataLength; i++) {
-                                std::print(" {:02X}", static_cast<unsigned>(event.packet->data[i]));
-                            }
+            ISteamNetworkingMessage* message = nullptr;
 
-                            std::println(". Channel: {}", event.channelID);
+            int received = m_pInterface->ReceiveMessagesOnPollGroup(
+                m_hPollGroup,
+                &message,
+                1
+            );
 
-                            enet_packet_destroy(event.packet);
-                            break;
-                        }
-                        case ENET_EVENT_TYPE_DISCONNECT: {
-                            std::println("{} disconnected.", event.peer->data);
-                            break;
-                        }
-                        case ENET_EVENT_TYPE_DISCONNECT_TIMEOUT: {
-                            std::println("{} disconnected due to timeout.", event.peer->data);
-                            break;
-                        }
-                        case ENET_EVENT_TYPE_NONE:
-                            break;
-                    }
+            if (received > 0) {
+                for (const auto& callback : clientReceivedMessageCallbacks) {
+                    callback({
+                        static_cast<const std::byte*>(message->m_pData),
+                        static_cast<std::size_t>(message->m_cbSize)
+                        },
+                        message->m_conn
+                    );
+                }
+                message->Release();
+            }
+
+            return {};
+        }
+
+        std::expected<void, std::error_code> disconnectConnection(
+            HSteamNetConnection hConn, bool enableLinger
+        ) {
+            if (!network::isNetworkInitialized()) {
+                return std::unexpected(
+                    std::make_error_code(std::errc::not_connected)
+                );
+            }
+
+            ISteamNetworkingSockets* sockets = SteamNetworkingSockets();
+
+            if (!sockets->CloseConnection(
+                hConn,
+                k_ESteamNetConnectionEnd_App_Generic,
+                nullptr,
+                enableLinger
+            )) {
+                return std::unexpected(
+                    std::make_error_code(std::errc::io_error)
+                );;
+            }
+
+            for (const auto& callback : clientDisconnectedCallbacks) {
+                callback(hConn);
+            }
+
+            return {};
+        }
+
+        void close() {
+            if (m_pInterface == nullptr) {
+                return;
+            }
+
+            if (m_hListenSocket != k_invalidSocket) {
+                m_pInterface->CloseListenSocket(m_hListenSocket);
+                m_hListenSocket = k_invalidSocket;
+            }
+
+            if (m_hPollGroup != k_invalidPollGroup) {
+                m_pInterface->DestroyPollGroup(m_hPollGroup);
+                m_hPollGroup = k_invalidPollGroup;
+            }
+
+            m_pInterface = nullptr;
+            s_pCallbackInstance = nullptr;
+
+            GameNetworkingSockets_Kill();
+        }
+
+        private:
+            inline static Server* s_pCallbackInstance = nullptr;
+
+            static void SteamNetConnectionStatusChangedCallback(
+                SteamNetConnectionStatusChangedCallback_t* pInfo
+            ) {
+                if (s_pCallbackInstance != nullptr) {
+                    s_pCallbackInstance->OnConnectionStatusChanged(pInfo);
                 }
             }
 
-            enet_host_destroy(server);
-            enet_deinitialize();
-        }
+            void OnConnectionStatusChanged(SteamNetConnectionStatusChangedCallback_t* pInfo) {
+                HSteamNetConnection hConn = pInfo->m_hConn;
+                SteamNetConnectionInfo_t info = pInfo->m_info;
+
+                switch (info.m_eState) {
+                    case k_ESteamNetworkingConnectionState_None:
+                            break;
+
+                    case k_ESteamNetworkingConnectionState_Connecting:
+                        if (m_pInterface->AcceptConnection(hConn) != k_EResultOK) {
+                            m_pInterface->CloseConnection(hConn, 0, nullptr, false);
+                            break;
+                        }
+
+                        if (!m_pInterface->SetConnectionPollGroup(hConn, m_hPollGroup)) {
+                            m_pInterface->CloseConnection(hConn, 0, nullptr, false);
+                            break;
+                        }
+
+                        for (const auto& clientConnectedCallback : clientConnectedCallbacks) {
+                            clientConnectedCallback(hConn);
+                        }
+
+                        break;
+
+                    case k_ESteamNetworkingConnectionState_FindingRoute:
+                    case k_ESteamNetworkingConnectionState_FinWait:
+                    case k_ESteamNetworkingConnectionState_Linger:
+                    case k_ESteamNetworkingConnectionState_Dead:
+                    case k_ESteamNetworkingConnectionState__Force32Bit:
+                    case k_ESteamNetworkingConnectionState_Connected:
+                        break;
+
+                    case k_ESteamNetworkingConnectionState_ClosedByPeer:
+                    case k_ESteamNetworkingConnectionState_ProblemDetectedLocally : {
+                        const HSteamNetConnection hConn = pInfo->m_hConn;
+                        m_pInterface->CloseConnection(hConn, 0, nullptr, false);
+
+                        for (const auto& callback : clientDisconnectedCallbacks) {
+                            callback(hConn);
+                        }
+
+                        break;
+                    }
+                }
+            }
     };
+
 }

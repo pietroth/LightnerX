@@ -2,8 +2,10 @@ set(NETWORK_SOURCES)
 set(NETWORK_MODULES
     server.cppm
     client.cppm
-    send.cppm
-    client_manager.cppm
+    connection_manager.cppm
+    transport.cppm
+    network_manager.cppm
+    message_batch.cppm
 )
 
 if(NETWORK_SOURCES)

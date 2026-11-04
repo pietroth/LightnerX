@@ -9,4 +9,5 @@ target_sources(LightnerX
             intention.cppm
             notification.cppm
             response.cppm
+            message.cppm
 )
