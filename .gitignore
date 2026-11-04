@@ -1,58 +1,44 @@
-/build/
-/cmake-build-*/
-/out/
-/CMakeFiles/
-/CMakeCache.txt
-/cmake_install.cmake
-/CTestTestfile.cmake
-/compile_commands.json
-/Makefile
-/build.ninja
-/.ninja_deps
-/.ninja_log
 
+# Build
+build/
+cmake-build-*/
+out/
+
+# Compiled binaries and libraries
 *.o
 *.obj
 *.a
-*.lib
 *.so
 *.so.*
-*.dylib
 *.dll
+*.dylib
 *.exe
-*.out
-*.gch
-*.pch
 
+# CMake generated files
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+compile_commands.json
+.ninja_deps
+.ninja_log
+build.ninja
+
+# C++ Modules generated artifacts
 *.gcm
 *.pcm
 *.ifc
 *.modmap
-*.ddi
-*.dd
-*.dyndep
-/gcm.cache/
 
-*.gcda
-*.gcno
-*.gcov
-*.profraw
-*.profdata
-coverage/
-
-*.log
-*.tmp
-*.bak
-*.swp
-*~
-.DS_Store
-
-.vscode/
+# IDE
 .idea/
-.zed/
-.vs/
-*.user
-*.suo
+.vscode/
 
-/vendor/
-/deps/
+# OS
+.DS_Store
+Thumbs.db
+
+# Cache
+.cache/
+
+# Local library testing
+/main.cpp
