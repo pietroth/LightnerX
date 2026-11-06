@@ -1,8 +1,8 @@
 module;
 
-#include <cstdint>
-
 export module communication.event;
+
+import std;
 
 import communication.base_protocol;
 import communication.mbt;
@@ -17,7 +17,7 @@ export namespace communication {
         BaseProtocol protocol; // 2 bytes
         MBT mbt; // 2 bytes
 
-        Event(uint16_t size, uint16_t typeId) : protocol(size), mbt(typeId) {}
+        Event(std::uint16_t size, std::uint16_t typeId) : protocol(size), mbt(typeId) {}
     };
     #pragma pack(pop)
 }

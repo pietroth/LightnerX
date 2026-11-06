@@ -3,20 +3,18 @@ module;
 #include "steam/isteamnetworkingutils.h"
 #include <steam/steamnetworkingtypes.h>
 
-#include <cstring>
-#include <expected>
-#include <system_error>
-#include <vector>
-#include <span>
-
 export module network.message_batch;
 
+import std;
+
 import network.transport;
+import network.target;
+import network.connection_manager;
 
 namespace network {
     export struct OutboundMessage {
         SteamNetworkingMessage_t* message;
-        HSteamNetConnection connection;
+        Target target;
     };
 
     std::vector<OutboundMessage> messages;
@@ -27,13 +25,11 @@ namespace network {
 
     export std::expected<void, std::error_code> queueMessage(
         const std::span<const std::byte> message,
-        HSteamNetConnection hConn
+        Target target
     ) {
         if (messages.size() >= messages.capacity()) {
             return std::unexpected(std::make_error_code(std::errc::not_enough_memory));
         }
-
-        OutboundMessage outboundMessage;
 
         SteamNetworkingMessage_t* networkingMessage = SteamNetworkingUtils()->AllocateMessage(
             static_cast<int>(message.size())
@@ -42,10 +38,10 @@ namespace network {
         if (networkingMessage != nullptr) {
             std::memcpy(networkingMessage->m_pData, message.data(), message.size());
 
-            outboundMessage.message = networkingMessage;
-            outboundMessage.connection = hConn;
-
-            messages.push_back(outboundMessage);
+            messages.push_back(OutboundMessage{
+                networkingMessage,
+                std::move(target)
+            });
 
             return {};
         }
@@ -53,17 +49,36 @@ namespace network {
         return std::unexpected(std::make_error_code(std::errc::not_enough_memory));
     }
 
-    export std::expected<void, std::error_code> flushAll() {
+    export std::expected<void, std::error_code> flushAll(
+        const ConnectionManager& connectionManager
+    ) {
         std::error_code lastError;
 
         for (const auto& message : messages) {
-            auto result = network::sendToConnection(
-                std::span<const std::byte>{
-                    static_cast<const std::byte*>(message.message->m_pData),
-                    static_cast<size_t>(message.message->m_cbSize)
-                },
-                message.connection
-            );
+            std::span<const std::byte> data{
+                static_cast<const std::byte*>(message.message->m_pData),
+                static_cast<size_t>(message.message->m_cbSize)
+            };
+
+            std::expected<void, std::error_code> result;
+
+            if (message.target.isSingle()) {
+                result = network::sendToConnection(
+                    data,
+                    std::get<HSteamNetConnection>(message.target.connection)
+                );
+            } else if (std::holds_alternative<std::vector<HSteamNetConnection>>(message.target.connection)) {
+                result = network::sendToConnections(
+                    data,
+                    std::get<std::vector<HSteamNetConnection>>(message.target.connection)
+                );
+            } else {
+                result = network::broadcast(
+                    data,
+                    connectionManager,
+                    message.target.broadcastExceptions
+                );
+            }
 
             if (!result) {
                 lastError = result.error();

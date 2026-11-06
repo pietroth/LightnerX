@@ -5,16 +5,10 @@ module;
 #include <steam/steamnetworkingsockets.h>
 #include <steam/isteamnetworkingutils.h>
 
-#include <system_error>
-#include <expected>
-#include <system_error>
-#include <vector>
-#include <functional>
-#include <span>
-#include <string>
-#include <cstddef>
 
 export module network.client;
+
+import std;
 
 import network.network_manager;
 

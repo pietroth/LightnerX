@@ -3,17 +3,12 @@ module;
 #include "steam/isteamnetworkingutils.h"
 #include "steam/steamnetworkingtypes.h"
 
-#include <functional>
-#include <vector>
-#include <variant>
-#include <span>
-#include <cstdint>
-#include <cstring>
-#include <optional>
-
 export module communication.message;
 
+import std;
+
 import network.message_batch;
+import network.target;
 import network.connection_manager;
 import communication.notification;
 import communication.intention;
@@ -180,7 +175,7 @@ export namespace communication {
     network::OutboundMessage event2OutboundMessage(
         const communication::Event& event,
         const std::span<const std::byte> payload,
-        HSteamNetConnection hConn
+        network::Target target
     ) {
         const auto size = sizeof(event) + payload.size();
         auto* message = SteamNetworkingUtils()->AllocateMessage(static_cast<int>(size));
@@ -191,13 +186,13 @@ export namespace communication {
             std::memcpy(static_cast<std::byte*>(message->m_pData) + sizeof(event), payload.data(), payload.size());
         }
 
-        return {message, hConn};
+        return {message, std::move(target)};
     }
 
     network::OutboundMessage intention2OutboundMessage(
         const communication::Intention& intention,
         const std::span<const std::byte> payload,
-        HSteamNetConnection hConn
+        network::Target target
     ) {
         const auto size = sizeof(intention) + payload.size();
         auto* message = SteamNetworkingUtils()->AllocateMessage(static_cast<int>(size));
@@ -208,13 +203,13 @@ export namespace communication {
             std::memcpy(static_cast<std::byte*>(message->m_pData) + sizeof(intention), payload.data(), payload.size());
         }
 
-        return {message, hConn};
+        return {message, std::move(target)};
     }
 
     network::OutboundMessage response2OutboundMessage(
         const communication::Response& response,
         const std::span<const std::byte> payload,
-        HSteamNetConnection hConn
+        network::Target target
     ) {
         const auto size = sizeof(response) + payload.size();
         auto* message = SteamNetworkingUtils()->AllocateMessage(static_cast<int>(size));
@@ -225,13 +220,13 @@ export namespace communication {
             std::memcpy(static_cast<std::byte*>(message->m_pData) + sizeof(response), payload.data(), payload.size());
         }
 
-        return {message, hConn};
+        return {message, std::move(target)};
     }
 
     network::OutboundMessage unsuccessfulResponse2OutboundMessage(
         const communication::UnsuccessfulResponse& response,
         const std::span<const std::byte> payload,
-        HSteamNetConnection hConn
+        network::Target target
     ) {
         const auto size = sizeof(response) + payload.size();
         auto* message = SteamNetworkingUtils()->AllocateMessage(static_cast<int>(size));
@@ -242,13 +237,13 @@ export namespace communication {
             std::memcpy(static_cast<std::byte*>(message->m_pData) + sizeof(response), payload.data(), payload.size());
         }
 
-        return {message, hConn};
+        return {message, std::move(target)};
     }
 
     network::OutboundMessage notification2OutboundMessage(
         const communication::Notification& notification,
         const std::span<const std::byte> payload,
-        HSteamNetConnection hConn
+        network::Target target
     ) {
         const auto size = sizeof(notification) + payload.size();
         auto* message = SteamNetworkingUtils()->AllocateMessage(static_cast<int>(size));
@@ -263,6 +258,6 @@ export namespace communication {
             );
         }
 
-        return {message, hConn};
+        return {message, std::move(target)};
     }
 }

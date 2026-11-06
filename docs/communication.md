@@ -82,7 +82,7 @@ No servidor, o `NotificationRegistry` informa quais `type_id` devem ser interpre
 
 communication::NotificationRegistry registry;
 registry.registerId(47);
-registry.registerIds(std::unordered_set<uint16_t>{99, 100});
+registry.registerIds(std::unordered_set<std::uint16_t>{99, 100});
 ```
 
 Os valores de `type_id` são definidos pela aplicação. Não existe uma tabela universal de tipos INER.
@@ -129,6 +129,18 @@ O tamanho informado deve incluir o cabeçalho e o payload. Os conversores copiam
 
 Esse ID interno pertence à implementação de gerenciamento de conexões e não é um campo do protocolo INER.
 
+## Destinos de rede
+
+`network::Target` define para onde uma mensagem enfileirada será enviada. Crie destinos pelas fábricas estáticas:
+
+| Fábrica | Destino |
+| --- | --- |
+| `Target::single(connection)` | uma conexão específica |
+| `Target::group(connections)` | todas as conexões presentes no vetor informado |
+| `Target::broadcast(exceptions)` | todas as conexões ativas do `ConnectionManager`, exceto os handles informados |
+
+`Target::group` preserva a seleção explícita de conexões. Já `Target::broadcast` consulta o `ConnectionManager` no momento do flush, portanto as exceções são sempre expressas como `HSteamNetConnection`.
+
 ## Fluxo de recebimento
 
 ```text
@@ -142,25 +154,29 @@ Rede -> callback do Client -> authorityInterpret -> callback da aplicação
 
 O fluxo comum é:
 
-1. Construir o cabeçalho com o tamanho total da mensagem.
-2. Usar o conversor correspondente para obter um `network::OutboundMessage`.
-3. Copiar seus bytes para `queueMessage`.
-4. Liberar o `SteamNetworkingMessage_t` retornado pelo conversor.
-5. Chamar `flushAll()` para enviar a fila.
+1. Chamar `initMessagesBatcher(capacity)` antes do primeiro enfileiramento.
+2. Construir o cabeçalho com o tamanho total da mensagem.
+3. Criar um `network::Target`.
+4. Usar o conversor correspondente para obter um `network::OutboundMessage`.
+5. Copiar seus bytes para `queueMessage(bytes, std::move(outbound.target))`.
+6. Liberar a mensagem original retornada pelo conversor com `outbound.message->Release()`.
+7. Chamar `flushAll(connectionManager)` para enviar a fila.
 
-Exemplo de `Notification`:
+Exemplo de `Notification` para todos os clientes, exceto uma conexão:
 
 ```cpp
 const std::vector<std::byte> payload = /* dados da aplicação */;
 const communication::Notification notification{
-    static_cast<uint16_t>(sizeof(communication::Notification) + payload.size()),
+    static_cast<std::uint16_t>(
+        sizeof(communication::Notification) + payload.size()
+    ),
     47
 };
 
 auto outbound = communication::notification2OutboundMessage(
     notification,
     {payload.data(), payload.size()},
-    connection
+    network::Target::broadcast({connectionToSkip})
 );
 
 const std::span<const std::byte> bytes{
@@ -168,12 +184,17 @@ const std::span<const std::byte> bytes{
     static_cast<std::size_t>(outbound.message->m_cbSize)
 };
 
-const auto queued = network::queueMessage(bytes, outbound.connection);
+const auto queued = network::queueMessage(
+    bytes,
+    std::move(outbound.target)
+);
 outbound.message->Release();
 
 if (queued) {
-    network::flushAll();
+    network::flushAll(connections);
 }
 ```
+
+`queueMessage` aloca uma mensagem interna e copia os bytes recebidos. A chamada de `Release()` libera somente a mensagem original criada pelo conversor. O batcher mantém sua própria cópia e a libera durante `flushAll`, depois de enviar a mensagem segundo o `Target` armazenado.
 
 Para `Event` e `Response`, o campo `size` deve usar o valor combinado descrito acima. Para `Intention` e `Notification`, ele usa o tamanho total diretamente.

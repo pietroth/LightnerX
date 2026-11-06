@@ -6,6 +6,7 @@ set(NETWORK_MODULES
     transport.cppm
     network_manager.cppm
     message_batch.cppm
+    target.cppm
 )
 
 if(NETWORK_SOURCES)

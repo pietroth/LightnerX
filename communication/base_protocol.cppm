@@ -1,14 +1,15 @@
 module;
-#include <cstdint>
 
 export module communication.base_protocol;
+
+import std;
 
 export namespace communication {
     #pragma pack(push, 1)
     struct BaseProtocol {
-        uint16_t size;
+        std::uint16_t size;
 
-        BaseProtocol(uint16_t size) : size(size) {}
+        BaseProtocol(std::uint16_t size) : size(size) {}
     };
     #pragma pack(pop)
 }

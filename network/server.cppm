@@ -5,15 +5,9 @@ module;
 #include <steam/steamnetworkingsockets.h>
 #include <steam/isteamnetworkingutils.h>
 
-#include <cstdint>
-#include <cstddef>
-#include <expected>
-#include <functional>
-#include <print>
-#include <system_error>
-#include <vector>
-
 export module network.server;
+
+import std;
 
 import network.network_manager;
 
@@ -86,7 +80,7 @@ export namespace network {
                 s_pCallbackInstance = nullptr;
                 GameNetworkingSockets_Kill();
 
-                std::println(stderr, "Failed to create listen socket.");
+                std::println(std::cerr, "Failed to create listen socket.");
                 return std::unexpected(std::make_error_code(std::errc::resource_unavailable_try_again));
             }
 
@@ -97,7 +91,7 @@ export namespace network {
                 m_pInterface->CloseListenSocket(m_hListenSocket);
                 GameNetworkingSockets_Kill();
 
-                std::println(stderr, "Failed to create poll group.");
+                std::println(std::cerr, "Failed to create poll group.");
                 return std::unexpected(std::make_error_code(std::errc::resource_unavailable_try_again));
             }
 

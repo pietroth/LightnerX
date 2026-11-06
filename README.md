@@ -1,6 +1,6 @@
 # LightnerX
 
-LightnerX é uma biblioteca modular em C++ para construir aplicações que se comunicam usando o protocolo semântico INER. Ela oferece tipos para representar mensagens, interpretadores, callbacks, gerenciamento de conexões e uma camada de transporte baseada em GameNetworkingSockets.
+LightnerX é uma biblioteca modular estática em C++ para construir aplicações que se comunicam usando o protocolo semântico INER. O projeto CMake fornece a target `LightnerX`; ele não produz nem exige um executável próprio. A biblioteca oferece tipos para representar mensagens, interpretadores, callbacks, gerenciamento de conexões e uma camada de transporte baseada em GameNetworkingSockets.
 
 O INER define o significado das mensagens trocadas entre uma Autoridade e um Obediente. Ele não define sockets, conexões ou um modelo de execução. Esses recursos são fornecidos pelos componentes de rede do LightnerX e podem ser conectados à aplicação conforme a necessidade do desenvolvedor.
 

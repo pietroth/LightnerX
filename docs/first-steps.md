@@ -56,7 +56,7 @@ int main() {
     );
 
     interpreter.addObedientInterpretedMessageCallback(
-        [](communication::Message message, uint16_t clientId) {
+        [](communication::Message message, std::uint16_t clientId) {
             std::println("Mensagem recebida do cliente {}", clientId);
             // Use std::visit(message.header) para examinar o tipo.
         }
@@ -140,8 +140,83 @@ Os métodos `server.update()` e `client.update()` são chamados pela aplicação
 
 A biblioteca não exige uma quantidade específica de threads nem um intervalo fixo entre atualizações.
 
+## Envio em lote
+
+Antes de enfileirar mensagens, inicialize o batcher com a capacidade que a aplicação deseja manter pendente:
+
+```cpp
+network::initMessagesBatcher(64);
+```
+
+O destino é definido por `network::Target`. O exemplo a seguir cria um `Event`, encaminha-o para um grupo e envia a fila. O mesmo fluxo vale para os outros conversores de mensagem.
+
+```cpp
+#include "steam/steamnetworkingtypes.h"
+
+#include <cstddef>
+#include <cstdint>
+#include <span>
+#include <utility>
+#include <vector>
+
+import communication.event;
+import communication.message;
+import network.connection_manager;
+import network.message_batch;
+import network.target;
+
+void sendEventToGroup(
+    std::span<const std::byte> payload,
+    std::vector<HSteamNetConnection> receivers,
+    const network::ConnectionManager& connections
+) {
+    const auto totalSize = sizeof(communication::Event) + payload.size();
+    const communication::Event event{
+        static_cast<std::uint16_t>(totalSize << 1),
+        47
+    };
+
+    auto outbound = communication::event2OutboundMessage(
+        event,
+        payload,
+        network::Target::group(std::move(receivers))
+    );
+
+    const std::span<const std::byte> bytes{
+        static_cast<const std::byte*>(outbound.message->m_pData),
+        static_cast<std::size_t>(outbound.message->m_cbSize)
+    };
+
+    const auto queued = network::queueMessage(
+        bytes,
+        std::move(outbound.target)
+    );
+    outbound.message->Release();
+
+    if (!queued) {
+        return;
+    }
+
+    const auto flushed = network::flushAll(connections);
+    if (!flushed) {
+        return;
+    }
+}
+```
+
+`queueMessage` copia os bytes para uma mensagem interna do batcher. Por isso, a mensagem criada pelo conversor continua sendo de propriedade do chamador e deve receber `Release()` depois que `queueMessage` terminar, inclusive se o enfileiramento retornar um erro.
+
+`std::move(outbound.target)` transfere o destino para a mensagem enfileirada. Após a transferência, a aplicação não deve reutilizar `outbound.target`; o ponteiro `outbound.message` permanece válido até a chamada de `Release()`.
+
+Os destinos disponíveis são:
+
+```cpp
+auto oneClient = network::Target::single(connection);
+auto selectedClients = network::Target::group({firstConnection, secondConnection});
+auto everyoneElse = network::Target::broadcast({connectionToSkip});
+```
+
 ## Próximos passos
 
-- Consulte [Comunicação e protocolo INER](communication.md) para entender os cabeçalhos e os papéis semânticos.
-- Consulte [Referência da API](api.md) para os componentes de rede, mensagens e batcher.
-- Use `notification2OutboundMessage`, `event2OutboundMessage`, `intention2OutboundMessage`, `response2OutboundMessage` e `unsuccessfulResponse2OutboundMessage` para montar mensagens de saída.
+- Consulte [Comunicação e protocolo INER](communication.md) para entender os cabeçalhos, destinos e fluxos de envio.
+- Consulte [Referência da API](api.md) para os componentes de rede, mensagens, `Target` e batcher.

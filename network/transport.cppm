@@ -4,13 +4,9 @@ module;
 #include "steam/steamclientpublic.h"
 #include "steam/steamnetworkingtypes.h"
 
-#include <cstddef>
-#include <span>
-#include <system_error>
-#include <expected>
-#include <optional>
-
 export module network.transport;
+
+import std;
 
 import network.connection_manager;
 import network.network_manager;
@@ -51,13 +47,39 @@ export namespace network {
         );
     }
 
+    std::expected<void, std::error_code> sendToConnections(
+        const std::span<const std::byte> message,
+        const std::vector<HSteamNetConnection> connections
+    ) {
+        std::optional<std::error_code> error;
+
+        for (auto conn : connections) {
+            auto result = sendToConnection(message, conn);
+
+            if (!result && !error) {
+                error = result.error();
+            }
+        }
+
+        if (error) {
+            return std::unexpected(*error);
+        }
+
+        return {};
+    }
+
     std::expected<void, std::error_code> broadcast(
         const std::span<const std::byte> message,
-        const network::ConnectionManager& connectionManager
+        const network::ConnectionManager& connectionManager,
+        const std::vector<HSteamNetConnection> exceptions
     ) {
         std::optional<std::error_code> error;
 
         connectionManager.forEach([&](uint16_t id, HSteamNetConnection hConn) {
+            if (std::ranges::contains(exceptions, hConn)) {
+                return ;
+            }
+
             auto result = sendToConnection(message, hConn);
 
             if (!result && !error) {

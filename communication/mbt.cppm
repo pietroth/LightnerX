@@ -1,15 +1,14 @@
 module;
-
-#include <cstdint>
-
 export module communication.mbt;
+
+import std;
 
 export namespace communication {
     #pragma pack(push, 1)
     struct MBT {
-        uint16_t type;
+        std::uint16_t type;
 
-        MBT(uint16_t type) : type(type) {}
+        MBT(std::uint16_t type) : type(type) {}
     };
     #pragma pack(pop)
 }

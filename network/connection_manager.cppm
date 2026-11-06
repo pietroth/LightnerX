@@ -3,12 +3,9 @@ module;
 #include "steam/steamnetworkingtypes.h"
 #include <steam/isteamnetworkingsockets.h>
 
-#include <optional>
-#include <vector>
-#include <set>
-#include <cstdint>
-
 export module network.connection_manager;
+
+import std;
 
 import network.network_manager;
 
