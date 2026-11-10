@@ -43,8 +43,9 @@ interpreter.authorityInterpret(bytes);
 `Event` comunica um acontecimento da Autoridade. Seu cabeçalho contém:
 
 - `BaseProtocol::size`;
-- `MBT::type`, usado como `type_id`;
-- payload opcional.
+- `MBT::type`, usado como `type_id`.
+
+O payload, quando presente, vem depois do cabeçalho.
 
 ### Response
 
@@ -57,9 +58,9 @@ Os status são expostos pelas constantes do módulo `communication.response`:
 | `APPROVED_RESPONSE` | `0` | intenção aprovada integralmente | `Response` |
 | `DENIED_RESPONSE` | `1` | intenção negada | `UnsuccessfulResponse` |
 | `PARTIALLY_APPROVED_RESPONSE` | `2` | intenção parcialmente aplicada | `UnsuccessfulResponse` |
-| `FAILURE_RESPONSE` | `3` | falha no processamento | `Response` |
+| `FAILURE_RESPONSE` | `3` | erro interno durante o processamento | `Response` |
 
-`UnsuccessfulResponse` acrescenta `reasonCode` ao cabeçalho. Para respostas parcialmente aprovadas, o payload contém a parte aplicada conforme o contrato da aplicação.
+Uma falha não significa necessariamente que a intenção foi negada; a aplicação pode decidir tentar novamente. `UnsuccessfulResponse` acrescenta `reasonCode` ao cabeçalho de respostas negadas ou parcialmente aprovadas. Na aprovação parcial, o significado do payload é definido pela aplicação.
 
 ### Intention
 
@@ -67,29 +68,31 @@ Os status são expostos pelas constantes do módulo `communication.response`:
 
 - `BaseProtocol::size`;
 - `MBT::type`;
-- `correlationId`;
-- payload opcional.
+- `correlationId`.
+
+O payload da intenção vem depois desse cabeçalho.
 
 ### Notification
 
-`Notification` comunica uma informação à Autoridade sem representar uma solicitação de alteração de estado. Seu cabeçalho contém `size`, `type` e payload opcional.
+`Notification` comunica uma informação à Autoridade sem exigir validação de estado, pois não solicita alteração dos estados internos da Autoridade. Seu cabeçalho contém `size` e `type`, seguido pelo payload opcional.
 
 No servidor, o `NotificationRegistry` informa quais `type_id` devem ser interpretados como `Notification`:
 
 ```cpp
-#include <cstdint>
-#include <unordered_set>
+import std;
+import communication.notification;
 
-communication::NotificationRegistry registry;
-registry.registerId(47);
-registry.registerIds(std::unordered_set<std::uint16_t>{99, 100});
+void registerNotifications(communication::NotificationRegistry& registry) {
+    registry.registerId(47);
+    registry.registerIds(std::unordered_set<std::uint16_t>{99, 100});
+}
 ```
 
-Os valores de `type_id` são definidos pela aplicação. Não existe uma tabela universal de tipos INER.
+Os valores de `type_id` são definidos pela aplicação. Não existe uma tabela universal de tipos INER. Na recepção de mensagens do Obediente, os IDs registrados identificam notificações; os demais identificam intenções. Para enviar notificações, use `notification2OutboundMessage`.
 
 ## Representação binária
 
-As estruturas são empacotadas sem padding adicional por meio de `#pragma pack(push, 1)`.
+As estruturas de cabeçalho são empacotadas sem padding adicional por meio de `#pragma pack(push, 1)`. Os conversores copiam os campos na representação nativa da máquina; os participantes devem usar uma representação compatível para esses campos e combinar o formato do payload.
 
 ### Mensagens da Autoridade
 
@@ -108,7 +111,7 @@ Event:    (tamanho_total << 1) | 0
 Response: (tamanho_total << 1) | 1
 ```
 
-O interpretador recupera o tamanho com `base >> 1` e a direção da mensagem com `base & 1`.
+O interpretador recupera o tamanho com `base >> 1` e distingue `Event` de `Response` com `base & 1`. Nos cabeçalhos entregues ao callback, `protocol.size` já contém o tamanho decodificado, sem o bit de tipo.
 
 ### Mensagens do Obediente
 
@@ -127,19 +130,20 @@ O tamanho informado deve incluir o cabeçalho e o payload. Os conversores copiam
 - `correlationId` relaciona uma resposta com a intenção correspondente.
 - O ID recebido no callback de mensagens interpretadas pelo servidor é o identificador interno atribuído pelo `ConnectionManager`.
 
-Esse ID interno pertence à implementação de gerenciamento de conexões e não é um campo do protocolo INER.
+Esse ID interno pertence à implementação de gerenciamento de conexões e não é um campo do protocolo INER. O nome `originId` também não designa um campo do protocolo. Destinos de rede usam handles `HSteamNetConnection`, distintos dos IDs internos e dos identificadores semânticos.
 
 ## Destinos de rede
 
-`network::Target` define para onde uma mensagem enfileirada será enviada. Crie destinos pelas fábricas estáticas:
+`network::Target`, exportado pelo módulo `network.target`, define para onde uma mensagem enfileirada será enviada. As fábricas estáticas criam a descrição do destino:
 
 | Fábrica | Destino |
 | --- | --- |
 | `Target::single(connection)` | uma conexão específica |
 | `Target::group(connections)` | todas as conexões presentes no vetor informado |
-| `Target::broadcast(exceptions)` | todas as conexões ativas do `ConnectionManager`, exceto os handles informados |
+| `Target::broadcast()` | todas as conexões registradas no `ConnectionManager` |
+| `Target::broadcast(exceptions)` | todas as conexões registradas no `ConnectionManager`, exceto os handles informados |
 
-`Target::group` preserva a seleção explícita de conexões. Já `Target::broadcast` consulta o `ConnectionManager` no momento do flush, portanto as exceções são sempre expressas como `HSteamNetConnection`.
+`Target::group` guarda a seleção explícita de handles. O broadcast consulta o `ConnectionManager` passado a `flushAll` no momento do flush, usando as associações mantidas pela aplicação. Suas exceções também são handles `HSteamNetConnection`.
 
 ## Fluxo de recebimento
 
@@ -150,51 +154,72 @@ Rede -> callback do Client -> authorityInterpret -> callback da aplicação
 
 `MessageInterpreter` entrega um `communication::Message` cujo `header` contém o tipo concreto em uma `std::variant` e cujo `payload` é um `std::span<const std::byte>`.
 
+Os callbacks são executados durante a chamada de interpretação. O cabeçalho é entregue por valor, mas o span apenas referencia os bytes recebidos. No fluxo com `Server` ou `Client`, esses bytes são liberados depois dos callbacks de recebimento. Para conservar o payload, copie seus bytes durante o callback; copiar apenas `Message` mantém a referência ao mesmo buffer.
+
 ## Fluxo de envio
 
 O fluxo comum é:
 
-1. Chamar `initMessagesBatcher(capacity)` antes do primeiro enfileiramento.
+1. Inicializar a rede e chamar `initMessagesBatcher(capacity)` antes do primeiro enfileiramento.
 2. Construir o cabeçalho com o tamanho total da mensagem.
 3. Criar um `network::Target`.
 4. Usar o conversor correspondente para obter um `network::OutboundMessage`.
-5. Copiar seus bytes para `queueMessage(bytes, std::move(outbound.target))`.
-6. Liberar a mensagem original retornada pelo conversor com `outbound.message->Release()`.
-7. Chamar `flushAll(connectionManager)` para enviar a fila.
+5. Chamar `queueMessage(bytes, std::move(outbound.target))`, que copia os bytes para a fila.
+6. Liberar a mensagem original com `outbound.message->Release()`, inclusive se o enfileiramento retornar erro.
+7. Verificar o resultado do enfileiramento e chamar `flushAll(connectionManager)` no momento escolhido pela aplicação.
 
-Exemplo de `Notification` para todos os clientes, exceto uma conexão:
+Exemplo de um `Event` da Autoridade com um byte de payload definido pela aplicação. A função pressupõe a rede e o batcher inicializados e permite broadcast com ou sem exceções:
 
 ```cpp
-const std::vector<std::byte> payload = /* dados da aplicação */;
-const communication::Notification notification{
-    static_cast<std::uint16_t>(
-        sizeof(communication::Notification) + payload.size()
-    ),
-    47
-};
+#include "steam/steamnetworkingtypes.h"
 
-auto outbound = communication::notification2OutboundMessage(
-    notification,
-    {payload.data(), payload.size()},
-    network::Target::broadcast({connectionToSkip})
-);
+import std;
+import communication.event;
+import communication.message;
+import network.connection_manager;
+import network.message_batch;
+import network.target;
 
-const std::span<const std::byte> bytes{
-    static_cast<const std::byte*>(outbound.message->m_pData),
-    static_cast<std::size_t>(outbound.message->m_cbSize)
-};
+std::expected<void, std::error_code> broadcastEvent(
+    const network::ConnectionManager& connections,
+    std::vector<HSteamNetConnection> exceptions = {}
+) {
+    const std::array payload{std::byte{0x01}};
+    const auto totalSize = sizeof(communication::Event) + payload.size();
+    const communication::Event event{
+        static_cast<std::uint16_t>(totalSize << 1),
+        47
+    };
 
-const auto queued = network::queueMessage(
-    bytes,
-    std::move(outbound.target)
-);
-outbound.message->Release();
+    auto outbound = communication::event2OutboundMessage(
+        event,
+        payload,
+        network::Target::broadcast(std::move(exceptions))
+    );
 
-if (queued) {
-    network::flushAll(connections);
+    const std::span<const std::byte> bytes{
+        static_cast<const std::byte*>(outbound.message->m_pData),
+        static_cast<std::size_t>(outbound.message->m_cbSize)
+    };
+
+    const auto queued = network::queueMessage(bytes, std::move(outbound.target));
+    outbound.message->Release();
+
+    if (!queued) {
+        return queued;
+    }
+    return network::flushAll(connections);
 }
 ```
 
-`queueMessage` aloca uma mensagem interna e copia os bytes recebidos. A chamada de `Release()` libera somente a mensagem original criada pelo conversor. O batcher mantém sua própria cópia e a libera durante `flushAll`, depois de enviar a mensagem segundo o `Target` armazenado.
+Chame `broadcastEvent(connections)` para todos ou `broadcastEvent(connections, {connectionToSkip})` para excluir um handle, verificando o `std::expected` retornado.
+
+### O que cada etapa faz
+
+`queueMessage` aloca uma mensagem interna e copia os bytes recebidos. O `std::move` aplicado a `outbound.target` transfere somente o destino. A chamada de `Release()` libera a mensagem original e seu buffer; a cópia enfileirada continua válida. Após liberar o original, não acesse `outbound.message` nem o span `bytes` construído sobre ele.
+
+`flushAll` percorre as mensagens pendentes, encaminha cada uma conforme seu destino e libera sua cópia interna. Todas as entradas são processadas e a fila é esvaziada mesmo quando há erros de envio. O retorno informa sucesso ou o último erro encontrado entre essas operações.
+
+O batching permite acumular várias mensagens antes de um flush. Cada entrada continua sendo uma mensagem separada; os payloads não são concatenados. A aplicação decide quando fazer o flush, por exemplo ao final de uma atualização. O sucesso indica que o transporte aceitou as operações de envio, sem confirmar o processamento no destinatário.
 
 Para `Event` e `Response`, o campo `size` deve usar o valor combinado descrito acima. Para `Intention` e `Notification`, ele usa o tamanho total diretamente.

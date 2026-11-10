@@ -14,7 +14,7 @@ O LightnerX fornece componentes reutilizáveis. A aplicação consumidora decide
 - como organizar o ciclo de vida das conexões;
 - quais módulos usar ou substituir por implementações próprias.
 
-É possível, por exemplo, usar `communication::MessageInterpreter` com um gerenciador de conexões próprio, desde que ele forneça as informações necessárias pelos contratos das funções utilizadas.
+É possível, por exemplo, entregar bytes de um transporte próprio a `communication::MessageInterpreter`. Para interpretar mensagens do Obediente, `obedientInterpret` recebe um `network::ConnectionManager`; uma aplicação que gerencie conexões por conta própria deve manter nesse objeto a associação entre handles e IDs utilizada pelo interpretador.
 
 ## Conceitos principais
 
@@ -25,11 +25,11 @@ O LightnerX fornece componentes reutilizáveis. A aplicação consumidora decide
 - **Intention:** solicitação de ação enviada à Autoridade.
 - **Notification:** informação enviada à Autoridade sem solicitação de alteração de estado.
 
-No LightnerX, os componentes de rede e comunicação são independentes. A rede entrega bytes; o `MessageInterpreter` interpreta esses bytes segundo a direção da comunicação.
+No LightnerX, a aplicação conecta os componentes por callbacks: a rede entrega bytes e o `MessageInterpreter` interpreta esses bytes segundo a direção da comunicação. No envio, `network::Target` permite selecionar uma conexão, um grupo ou um broadcast com ou sem exceções.
 
 ## Navegação
 
-- [Instalação e integração](docs/setup.md)
+- [Configuração](docs/setup.md)
 - [Primeiros passos](docs/first-steps.md)
 - [Comunicação e protocolo INER](docs/communication.md)
 - [Referência da API](docs/api.md)

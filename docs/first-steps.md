@@ -1,6 +1,6 @@
 # Primeiros passos
 
-Este guia mostra o fluxo essencial para montar um servidor e um cliente. Os exemplos usam os componentes do LightnerX diretamente e deixam o modelo de execução sob responsabilidade da aplicação.
+Este guia mostra o fluxo essencial para montar um servidor e um cliente. Os exemplos usam os componentes do LightnerX diretamente e deixam o modelo de execução sob responsabilidade da aplicação. Os dois programas ilustram aplicações consumidoras separadas; a biblioteca continua sendo uma biblioteca estática.
 
 ## Servidor
 
@@ -9,11 +9,9 @@ O servidor recebe bytes dos clientes, encaminha esses bytes ao `MessageInterpret
 ```cpp
 #include "steam/steamnetworkingtypes.h"
 
-#include <cstddef>
-#include <cstdint>
-#include <print>
-#include <span>
+import std;
 
+import communication.intention;
 import communication.message;
 import communication.notification;
 import network.connection_manager;
@@ -28,8 +26,13 @@ int main() {
     registry.registerId(47);
 
     server.addClientConnectedCallback(
-        [&connections](HSteamNetConnection connection) {
-            connections.add(connection);
+        [&connections, &server](HSteamNetConnection connection) {
+            if (!connections.add(connection)) {
+                const auto disconnected = server.disconnectConnection(connection, false);
+                if (!disconnected) {
+                    std::println("Falha ao desconectar: {}", disconnected.error().message());
+                }
+            }
         }
     );
 
@@ -58,7 +61,15 @@ int main() {
     interpreter.addObedientInterpretedMessageCallback(
         [](communication::Message message, std::uint16_t clientId) {
             std::println("Mensagem recebida do cliente {}", clientId);
-            // Use std::visit(message.header) para examinar o tipo.
+            std::visit([](const auto& header) {
+                using Header = std::remove_cvref_t<decltype(header)>;
+                if constexpr (std::is_same_v<Header, communication::Intention>) {
+                    std::println("Intenção {}, correlação {}",
+                                 header.mbt.type, header.correlationId);
+                } else if constexpr (std::is_same_v<Header, communication::Notification>) {
+                    std::println("Notificação {}", header.mbt.type);
+                }
+            }, message.header);
         }
     );
 
@@ -81,6 +92,8 @@ int main() {
 
 O callback de conexão deve atualizar o `ConnectionManager`, porque o interpretador usa esse objeto para associar a conexão ao ID entregue ao callback de mensagem interpretada.
 
+As lambdas capturam os componentes por referência para conectá-los. Mantenha esses objetos vivos enquanto seus callbacks puderem ser executados. O `payload` recebido aponta para os bytes da mensagem de rede; copie os bytes durante o callback se precisar usá-los depois.
+
 ## Cliente
 
 O cliente encaminha bytes recebidos do servidor ao método `authorityInterpret`.
@@ -88,11 +101,11 @@ O cliente encaminha bytes recebidos do servidor ao método `authorityInterpret`.
 ```cpp
 #include "steam/steamnetworkingtypes.h"
 
-#include <cstddef>
-#include <print>
-#include <span>
+import std;
 
+import communication.event;
 import communication.message;
+import communication.response;
 import network.client;
 
 int main() {
@@ -102,6 +115,26 @@ int main() {
     client.addServerReceivedMessageCallback(
         [&interpreter](std::span<const std::byte> bytes) {
             interpreter.authorityInterpret(bytes);
+        }
+    );
+
+    interpreter.addAuthorityInterpretedMessageCallback(
+        [](communication::Message message) {
+            std::visit([](const auto& header) {
+                using Header = std::remove_cvref_t<decltype(header)>;
+                if constexpr (std::is_same_v<Header, communication::Event>) {
+                    std::println("Evento {}", header.mbt.type);
+                } else if constexpr (
+                    std::is_same_v<Header, communication::Response> ||
+                    std::is_same_v<Header, communication::UnsuccessfulResponse>
+                ) {
+                    std::println("Resposta à intenção {}: status {}",
+                                 header.correlationId, header.status);
+                    if constexpr (std::is_same_v<Header, communication::UnsuccessfulResponse>) {
+                        std::println("Motivo {}", header.reasonCode);
+                    }
+                }
+            }, message.header);
         }
     );
 
@@ -115,13 +148,6 @@ int main() {
         std::println("Falha ao conectar: {}", connected.error().message());
         return 1;
     }
-
-    interpreter.addAuthorityInterpretedMessageCallback(
-        [](communication::Message message) {
-            std::println("Mensagem recebida do servidor");
-            // Use std::visit(message.header) para examinar o tipo.
-        }
-    );
 
     while (true) {
         if (const auto updated = client.update(1); !updated) {
@@ -140,24 +166,22 @@ Os métodos `server.update()` e `client.update()` são chamados pela aplicação
 
 A biblioteca não exige uma quantidade específica de threads nem um intervalo fixo entre atualizações.
 
+Os callbacks de recebimento executam durante `update()`, e os de interpretação executam na thread que chama o interpretador. Ao compartilhar componentes entre threads, organize a sincronização na aplicação. Para o batcher, serialize as chamadas de inicialização, enfileiramento e flush, que operam sobre a mesma fila.
+
 ## Envio em lote
 
-Antes de enfileirar mensagens, inicialize o batcher com a capacidade que a aplicação deseja manter pendente:
+Com a rede inicializada por `Server::start()`, `Client::start()` ou `network::networkInit()`, reserve espaço no batcher antes do primeiro enfileiramento. Importe `network.message_batch` e chame:
 
 ```cpp
 network::initMessagesBatcher(64);
 ```
 
-O destino é definido por `network::Target`. O exemplo a seguir cria um `Event`, encaminha-o para um grupo e envia a fila. O mesmo fluxo vale para os outros conversores de mensagem.
+O destino é definido por `network::Target`. A função a seguir cria um `Event`, encaminha-o para um grupo e envia a fila. Ela pressupõe a inicialização acima e devolve o resultado do enfileiramento ou do flush ao chamador. O mesmo fluxo vale para os outros conversores de mensagem.
 
 ```cpp
 #include "steam/steamnetworkingtypes.h"
 
-#include <cstddef>
-#include <cstdint>
-#include <span>
-#include <utility>
-#include <vector>
+import std;
 
 import communication.event;
 import communication.message;
@@ -165,12 +189,16 @@ import network.connection_manager;
 import network.message_batch;
 import network.target;
 
-void sendEventToGroup(
+std::expected<void, std::error_code> sendEventToGroup(
     std::span<const std::byte> payload,
     std::vector<HSteamNetConnection> receivers,
     const network::ConnectionManager& connections
 ) {
     const auto totalSize = sizeof(communication::Event) + payload.size();
+    if (totalSize > 0x7fff) {
+        return std::unexpected(std::make_error_code(std::errc::message_size));
+    }
+
     const communication::Event event{
         static_cast<std::uint16_t>(totalSize << 1),
         47
@@ -194,27 +222,27 @@ void sendEventToGroup(
     outbound.message->Release();
 
     if (!queued) {
-        return;
+        return queued;
     }
 
-    const auto flushed = network::flushAll(connections);
-    if (!flushed) {
-        return;
-    }
+    return network::flushAll(connections);
 }
 ```
 
 `queueMessage` copia os bytes para uma mensagem interna do batcher. Por isso, a mensagem criada pelo conversor continua sendo de propriedade do chamador e deve receber `Release()` depois que `queueMessage` terminar, inclusive se o enfileiramento retornar um erro.
 
-`std::move(outbound.target)` transfere o destino para a mensagem enfileirada. Após a transferência, a aplicação não deve reutilizar `outbound.target`; o ponteiro `outbound.message` permanece válido até a chamada de `Release()`.
+`std::move(outbound.target)` transfere somente o destino. Trate esse destino como consumido e crie outro `Target` para um novo envio. O ponteiro `outbound.message` permanece válido até `Release()`; após essa chamada, nem o ponteiro nem o span `bytes` devem ser acessados. O cabeçalho e o payload fornecidos ao conversor continuam pertencendo à aplicação.
 
-Os destinos disponíveis são:
+Com handles obtidos pelo cliente ou pelos callbacks de conexão do servidor, os destinos disponíveis são:
 
 ```cpp
 auto oneClient = network::Target::single(connection);
 auto selectedClients = network::Target::group({firstConnection, secondConnection});
+auto everyone = network::Target::broadcast();
 auto everyoneElse = network::Target::broadcast({connectionToSkip});
 ```
+
+Essas chamadas apenas descrevem destinos. Você pode enfileirar várias mensagens e executar `flushAll(connections)` ao final de uma etapa da aplicação; o flush imediato mostrado na função é uma escolha do exemplo.
 
 ## Próximos passos
 
