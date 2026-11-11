@@ -51,7 +51,7 @@ O payload, quando presente, vem depois do cabeçalho.
 
 `Response` relaciona o resultado a uma intenção por meio de `correlationId` e contém um `status`.
 
-Os status são expostos pelas constantes do módulo `communication.response`:
+Os status são expostos pelas constantes do módulo `lightnerx.communication.response`:
 
 | Constante | Valor | Significado | Tipo usado pelo LightnerX |
 | --- | ---: | --- | --- |
@@ -80,9 +80,9 @@ No servidor, o `NotificationRegistry` informa quais `type_id` devem ser interpre
 
 ```cpp
 import std;
-import communication.notification;
+import lightnerx.communication.notification;
 
-void registerNotifications(communication::NotificationRegistry& registry) {
+void registerNotifications(lightnerx::communication::NotificationRegistry& registry) {
     registry.registerId(47);
     registry.registerIds(std::unordered_set<std::uint16_t>{99, 100});
 }
@@ -134,7 +134,7 @@ Esse ID interno pertence à implementação de gerenciamento de conexões e não
 
 ## Destinos de rede
 
-`network::Target`, exportado pelo módulo `network.target`, define para onde uma mensagem enfileirada será enviada. As fábricas estáticas criam a descrição do destino:
+`lightnerx::network::Target`, exportado pelo módulo `lightnerx.network.target`, define para onde uma mensagem enfileirada será enviada. As fábricas estáticas criam a descrição do destino:
 
 | Fábrica | Destino |
 | --- | --- |
@@ -152,7 +152,7 @@ Rede -> callback do Server -> obedientInterpret -> callback da aplicação
 Rede -> callback do Client -> authorityInterpret -> callback da aplicação
 ```
 
-`MessageInterpreter` entrega um `communication::Message` cujo `header` contém o tipo concreto em uma `std::variant` e cujo `payload` é um `std::span<const std::byte>`.
+`MessageInterpreter` entrega um `lightnerx::communication::Message` cujo `header` contém o tipo concreto em uma `std::variant` e cujo `payload` é um `std::span<const std::byte>`.
 
 Os callbacks são executados durante a chamada de interpretação. O cabeçalho é entregue por valor, mas o span apenas referencia os bytes recebidos. No fluxo com `Server` ou `Client`, esses bytes são liberados depois dos callbacks de recebimento. Para conservar o payload, copie seus bytes durante o callback; copiar apenas `Message` mantém a referência ao mesmo buffer.
 
@@ -162,8 +162,8 @@ O fluxo comum é:
 
 1. Inicializar a rede e chamar `initMessagesBatcher(capacity)` antes do primeiro enfileiramento.
 2. Construir o cabeçalho com o tamanho total da mensagem.
-3. Criar um `network::Target`.
-4. Usar o conversor correspondente para obter um `network::OutboundMessage`.
+3. Criar um `lightnerx::network::Target`.
+4. Usar o conversor correspondente para obter um `lightnerx::network::OutboundMessage`.
 5. Chamar `queueMessage(bytes, std::move(outbound.target))`, que copia os bytes para a fila.
 6. Liberar a mensagem original com `outbound.message->Release()`, inclusive se o enfileiramento retornar erro.
 7. Verificar o resultado do enfileiramento e chamar `flushAll(connectionManager)` no momento escolhido pela aplicação.
@@ -174,27 +174,27 @@ Exemplo de um `Event` da Autoridade com um byte de payload definido pela aplica�
 #include "steam/steamnetworkingtypes.h"
 
 import std;
-import communication.event;
-import communication.message;
-import network.connection_manager;
-import network.message_batch;
-import network.target;
+import lightnerx.communication.event;
+import lightnerx.communication.message;
+import lightnerx.network.connection_manager;
+import lightnerx.network.message_batch;
+import lightnerx.network.target;
 
 std::expected<void, std::error_code> broadcastEvent(
-    const network::ConnectionManager& connections,
+    const lightnerx::network::ConnectionManager& connections,
     std::vector<HSteamNetConnection> exceptions = {}
 ) {
     const std::array payload{std::byte{0x01}};
-    const auto totalSize = sizeof(communication::Event) + payload.size();
-    const communication::Event event{
+    const auto totalSize = sizeof(lightnerx::communication::Event) + payload.size();
+    const lightnerx::communication::Event event{
         static_cast<std::uint16_t>(totalSize << 1),
         47
     };
 
-    auto outbound = communication::event2OutboundMessage(
+    auto outbound = lightnerx::communication::event2OutboundMessage(
         event,
         payload,
-        network::Target::broadcast(std::move(exceptions))
+        lightnerx::network::Target::broadcast(std::move(exceptions))
     );
 
     const std::span<const std::byte> bytes{
@@ -202,13 +202,13 @@ std::expected<void, std::error_code> broadcastEvent(
         static_cast<std::size_t>(outbound.message->m_cbSize)
     };
 
-    const auto queued = network::queueMessage(bytes, std::move(outbound.target));
+    const auto queued = lightnerx::network::queueMessage(bytes, std::move(outbound.target));
     outbound.message->Release();
 
     if (!queued) {
         return queued;
     }
-    return network::flushAll(connections);
+    return lightnerx::network::flushAll(connections);
 }
 ```
 

@@ -1,16 +1,16 @@
 module;
 
-export module communication.event;
+export module lightnerx.communication.event;
 
 import std;
 
-import communication.base_protocol;
-import communication.mbt;
-import network.client;
+import lightnerx.communication.base_protocol;
+import lightnerx.communication.mbt;
+import lightnerx.network.client;
 
-export namespace communication {
-    using namespace communication;
-    using namespace network;
+export namespace lightnerx::communication {
+    using namespace lightnerx::communication;
+    using namespace lightnerx::network;
 
     #pragma pack(push, 1)
     struct Event {

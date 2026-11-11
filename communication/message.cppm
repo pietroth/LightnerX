@@ -3,26 +3,26 @@ module;
 #include "steam/isteamnetworkingutils.h"
 #include "steam/steamnetworkingtypes.h"
 
-export module communication.message;
+export module lightnerx.communication.message;
 
 import std;
 
-import network.message_batch;
-import network.target;
-import network.connection_manager;
-import communication.notification;
-import communication.intention;
-import communication.response;
-import communication.event;
+import lightnerx.network.message_batch;
+import lightnerx.network.target;
+import lightnerx.network.connection_manager;
+import lightnerx.communication.notification;
+import lightnerx.communication.intention;
+import lightnerx.communication.response;
+import lightnerx.communication.event;
 
-export namespace communication {
+export namespace lightnerx::communication {
     struct Message {
         std::variant<
-            communication::Event,
-            communication::Intention,
-            communication::Response,
-            communication::UnsuccessfulResponse,
-            communication::Notification
+            lightnerx::communication::Event,
+            lightnerx::communication::Intention,
+            lightnerx::communication::Response,
+            lightnerx::communication::UnsuccessfulResponse,
+            lightnerx::communication::Notification
         > header;
         std::span<const std::byte> payload;
     };
@@ -46,9 +46,9 @@ export namespace communication {
 
         void obedientInterpret(
             const std::span<const std::byte> data,
-            const communication::NotificationRegistry& registry,
+            const lightnerx::communication::NotificationRegistry& registry,
             HSteamNetConnection hConn,
-            const network::ConnectionManager& connManager
+            const lightnerx::network::ConnectionManager& connManager
         ) {
             if (data.size_bytes() < 4) {
                 return;
@@ -61,8 +61,8 @@ export namespace communication {
             std::memcpy(&type, data.data() + 2, sizeof(type));
 
             if (registry.exist(type)) {
-                communication::Notification notification = Notification(size, type);
-                Message message {notification, data.subspan(sizeof(communication::Notification))};
+                lightnerx::communication::Notification notification = Notification(size, type);
+                Message message {notification, data.subspan(sizeof(lightnerx::communication::Notification))};
 
                 std::optional<uint16_t> id_opt = connManager.getClientId(hConn);
                 if (id_opt.has_value()) {
@@ -72,15 +72,15 @@ export namespace communication {
 
                 return;
             } else {
-                if (data.size_bytes() < sizeof(communication::Intention)) {
+                if (data.size_bytes() < sizeof(lightnerx::communication::Intention)) {
                     return;
                 }
 
                 uint16_t correlationId;
                 std::memcpy(&correlationId, data.data() + 4, sizeof(correlationId));
 
-                communication::Intention intention = Intention(size, type, correlationId);
-                Message message {intention, data.subspan(sizeof(communication::Intention))};
+                lightnerx::communication::Intention intention = Intention(size, type, correlationId);
+                Message message {intention, data.subspan(sizeof(lightnerx::communication::Intention))};
 
                 std::optional<uint16_t> id_opt = connManager.getClientId(hConn);
                 if (id_opt.has_value()) {
@@ -109,14 +109,14 @@ export namespace communication {
                 uint16_t typeId;
                 std::memcpy(&typeId, data.data() + 2, sizeof(typeId));
 
-                communication::Event event = Event(size, typeId);
-                Message message {event, data.subspan(sizeof(communication::Event))};
+                lightnerx::communication::Event event = Event(size, typeId);
+                Message message {event, data.subspan(sizeof(lightnerx::communication::Event))};
 
                 callAuthorityInterpretedCallbacks(message);
             } else {
                 // response
 
-                if (data.size_bytes() < sizeof(communication::Response)) {
+                if (data.size_bytes() < sizeof(lightnerx::communication::Response)) {
                     return;
                 }
 
@@ -127,27 +127,27 @@ export namespace communication {
                 std::memcpy(&status, data.data() + 4, sizeof(status));
 
                 switch (status) {
-                    case communication::APPROVED_RESPONSE:
-                    case communication::FAILURE_RESPONSE: {
-                        communication::Response response = Response(size, correlationId, status);
+                    case lightnerx::communication::APPROVED_RESPONSE:
+                    case lightnerx::communication::FAILURE_RESPONSE: {
+                        lightnerx::communication::Response response = Response(size, correlationId, status);
                         Message message {response, {}};
 
                         callAuthorityInterpretedCallbacks(message);
                         break;
                     }
 
-                    case communication::DENIED_RESPONSE:
-                    case communication::PARTIALLY_APPROVED_RESPONSE: {
-                        if (data.size_bytes() < sizeof(communication::UnsuccessfulResponse)) {
+                    case lightnerx::communication::DENIED_RESPONSE:
+                    case lightnerx::communication::PARTIALLY_APPROVED_RESPONSE: {
+                        if (data.size_bytes() < sizeof(lightnerx::communication::UnsuccessfulResponse)) {
                             return;
                         }
 
                         uint16_t reasonCode;
                         std::memcpy(&reasonCode, data.data() + 5, sizeof(reasonCode));
 
-                        communication::UnsuccessfulResponse unsuccessfulResponse =
+                        lightnerx::communication::UnsuccessfulResponse unsuccessfulResponse =
                             UnsuccessfulResponse(size, correlationId, status, reasonCode);
-                        Message message {unsuccessfulResponse, data.subspan(sizeof(communication::UnsuccessfulResponse))};
+                        Message message {unsuccessfulResponse, data.subspan(sizeof(lightnerx::communication::UnsuccessfulResponse))};
 
                         callAuthorityInterpretedCallbacks(message);
                         break;
@@ -172,10 +172,10 @@ export namespace communication {
         }
     };
 
-    network::OutboundMessage event2OutboundMessage(
-        const communication::Event& event,
+    lightnerx::network::OutboundMessage event2OutboundMessage(
+        const lightnerx::communication::Event& event,
         const std::span<const std::byte> payload,
-        network::Target target
+        lightnerx::network::Target target
     ) {
         const auto size = sizeof(event) + payload.size();
         auto* message = SteamNetworkingUtils()->AllocateMessage(static_cast<int>(size));
@@ -189,10 +189,10 @@ export namespace communication {
         return {message, std::move(target)};
     }
 
-    network::OutboundMessage intention2OutboundMessage(
-        const communication::Intention& intention,
+    lightnerx::network::OutboundMessage intention2OutboundMessage(
+        const lightnerx::communication::Intention& intention,
         const std::span<const std::byte> payload,
-        network::Target target
+        lightnerx::network::Target target
     ) {
         const auto size = sizeof(intention) + payload.size();
         auto* message = SteamNetworkingUtils()->AllocateMessage(static_cast<int>(size));
@@ -206,10 +206,10 @@ export namespace communication {
         return {message, std::move(target)};
     }
 
-    network::OutboundMessage response2OutboundMessage(
-        const communication::Response& response,
+    lightnerx::network::OutboundMessage response2OutboundMessage(
+        const lightnerx::communication::Response& response,
         const std::span<const std::byte> payload,
-        network::Target target
+        lightnerx::network::Target target
     ) {
         const auto size = sizeof(response) + payload.size();
         auto* message = SteamNetworkingUtils()->AllocateMessage(static_cast<int>(size));
@@ -223,10 +223,10 @@ export namespace communication {
         return {message, std::move(target)};
     }
 
-    network::OutboundMessage unsuccessfulResponse2OutboundMessage(
-        const communication::UnsuccessfulResponse& response,
+    lightnerx::network::OutboundMessage unsuccessfulResponse2OutboundMessage(
+        const lightnerx::communication::UnsuccessfulResponse& response,
         const std::span<const std::byte> payload,
-        network::Target target
+        lightnerx::network::Target target
     ) {
         const auto size = sizeof(response) + payload.size();
         auto* message = SteamNetworkingUtils()->AllocateMessage(static_cast<int>(size));
@@ -240,10 +240,10 @@ export namespace communication {
         return {message, std::move(target)};
     }
 
-    network::OutboundMessage notification2OutboundMessage(
-        const communication::Notification& notification,
+    lightnerx::network::OutboundMessage notification2OutboundMessage(
+        const lightnerx::communication::Notification& notification,
         const std::span<const std::byte> payload,
-        network::Target target
+        lightnerx::network::Target target
     ) {
         const auto size = sizeof(notification) + payload.size();
         auto* message = SteamNetworkingUtils()->AllocateMessage(static_cast<int>(size));

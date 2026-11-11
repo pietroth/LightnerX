@@ -1,13 +1,13 @@
 module;
 
-export module communication.response;
+export module lightnerx.communication.response;
 
 import std;
 
-import communication.base_protocol;
+import lightnerx.communication.base_protocol;
 
-export namespace communication {
-    using namespace communication;
+export namespace lightnerx::communication {
+    using namespace lightnerx::communication;
 
     constexpr std::uint8_t APPROVED_RESPONSE = 0;
     constexpr std::uint8_t DENIED_RESPONSE = 1;

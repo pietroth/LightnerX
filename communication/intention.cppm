@@ -1,13 +1,13 @@
 module;
 
-export module communication.intention;
+export module lightnerx.communication.intention;
 
 import std;
 
-import communication.base_protocol;
-import communication.mbt;
+import lightnerx.communication.base_protocol;
+import lightnerx.communication.mbt;
 
-export namespace communication {
+export namespace lightnerx::communication {
     #pragma pack(push, 1)
     struct Intention {
         BaseProtocol protocol; // 2 bytes

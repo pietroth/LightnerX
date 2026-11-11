@@ -3,13 +3,13 @@ module;
 #include "steam/steamnetworkingtypes.h"
 #include <steam/isteamnetworkingsockets.h>
 
-export module network.connection_manager;
+export module lightnerx.network.connection_manager;
 
 import std;
 
-import network.network_manager;
+import lightnerx.network.network_manager;
 
-export namespace network {
+export namespace lightnerx::network {
     constexpr int invalidConnection = 0;
 
     class ConnectionManager {

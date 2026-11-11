@@ -11,17 +11,17 @@ O servidor recebe bytes dos clientes, encaminha esses bytes ao `MessageInterpret
 
 import std;
 
-import communication.intention;
-import communication.message;
-import communication.notification;
-import network.connection_manager;
-import network.server;
+import lightnerx.communication.intention;
+import lightnerx.communication.message;
+import lightnerx.communication.notification;
+import lightnerx.network.connection_manager;
+import lightnerx.network.server;
 
 int main() {
-    network::Server server;
-    network::ConnectionManager connections{10, 10};
-    communication::MessageInterpreter interpreter;
-    communication::NotificationRegistry registry;
+    lightnerx::network::Server server;
+    lightnerx::network::ConnectionManager connections{10, 10};
+    lightnerx::communication::MessageInterpreter interpreter;
+    lightnerx::communication::NotificationRegistry registry;
 
     registry.registerId(47);
 
@@ -59,14 +59,14 @@ int main() {
     );
 
     interpreter.addObedientInterpretedMessageCallback(
-        [](communication::Message message, std::uint16_t clientId) {
+        [](lightnerx::communication::Message message, std::uint16_t clientId) {
             std::println("Mensagem recebida do cliente {}", clientId);
             std::visit([](const auto& header) {
                 using Header = std::remove_cvref_t<decltype(header)>;
-                if constexpr (std::is_same_v<Header, communication::Intention>) {
+                if constexpr (std::is_same_v<Header, lightnerx::communication::Intention>) {
                     std::println("Intenção {}, correlação {}",
                                  header.mbt.type, header.correlationId);
-                } else if constexpr (std::is_same_v<Header, communication::Notification>) {
+                } else if constexpr (std::is_same_v<Header, lightnerx::communication::Notification>) {
                     std::println("Notificação {}", header.mbt.type);
                 }
             }, message.header);
@@ -103,14 +103,14 @@ O cliente encaminha bytes recebidos do servidor ao método `authorityInterpret`.
 
 import std;
 
-import communication.event;
-import communication.message;
-import communication.response;
-import network.client;
+import lightnerx.communication.event;
+import lightnerx.communication.message;
+import lightnerx.communication.response;
+import lightnerx.network.client;
 
 int main() {
-    network::Client client;
-    communication::MessageInterpreter interpreter;
+    lightnerx::network::Client client;
+    lightnerx::communication::MessageInterpreter interpreter;
 
     client.addServerReceivedMessageCallback(
         [&interpreter](std::span<const std::byte> bytes) {
@@ -119,18 +119,18 @@ int main() {
     );
 
     interpreter.addAuthorityInterpretedMessageCallback(
-        [](communication::Message message) {
+        [](lightnerx::communication::Message message) {
             std::visit([](const auto& header) {
                 using Header = std::remove_cvref_t<decltype(header)>;
-                if constexpr (std::is_same_v<Header, communication::Event>) {
+                if constexpr (std::is_same_v<Header, lightnerx::communication::Event>) {
                     std::println("Evento {}", header.mbt.type);
                 } else if constexpr (
-                    std::is_same_v<Header, communication::Response> ||
-                    std::is_same_v<Header, communication::UnsuccessfulResponse>
+                    std::is_same_v<Header, lightnerx::communication::Response> ||
+                    std::is_same_v<Header, lightnerx::communication::UnsuccessfulResponse>
                 ) {
                     std::println("Resposta à intenção {}: status {}",
                                  header.correlationId, header.status);
-                    if constexpr (std::is_same_v<Header, communication::UnsuccessfulResponse>) {
+                    if constexpr (std::is_same_v<Header, lightnerx::communication::UnsuccessfulResponse>) {
                         std::println("Motivo {}", header.reasonCode);
                     }
                 }
@@ -170,44 +170,44 @@ Os callbacks de recebimento executam durante `update()`, e os de interpretação
 
 ## Envio em lote
 
-Com a rede inicializada por `Server::start()`, `Client::start()` ou `network::networkInit()`, reserve espaço no batcher antes do primeiro enfileiramento. Importe `network.message_batch` e chame:
+Com a rede inicializada por `Server::start()`, `Client::start()` ou `lightnerx::network::networkInit()`, reserve espaço no batcher antes do primeiro enfileiramento. Importe `lightnerx.network.message_batch` e chame:
 
 ```cpp
-network::initMessagesBatcher(64);
+lightnerx::network::initMessagesBatcher(64);
 ```
 
-O destino é definido por `network::Target`. A função a seguir cria um `Event`, encaminha-o para um grupo e envia a fila. Ela pressupõe a inicialização acima e devolve o resultado do enfileiramento ou do flush ao chamador. O mesmo fluxo vale para os outros conversores de mensagem.
+O destino é definido por `lightnerx::network::Target`. A função a seguir cria um `Event`, encaminha-o para um grupo e envia a fila. Ela pressupõe a inicialização acima e devolve o resultado do enfileiramento ou do flush ao chamador. O mesmo fluxo vale para os outros conversores de mensagem.
 
 ```cpp
 #include "steam/steamnetworkingtypes.h"
 
 import std;
 
-import communication.event;
-import communication.message;
-import network.connection_manager;
-import network.message_batch;
-import network.target;
+import lightnerx.communication.event;
+import lightnerx.communication.message;
+import lightnerx.network.connection_manager;
+import lightnerx.network.message_batch;
+import lightnerx.network.target;
 
 std::expected<void, std::error_code> sendEventToGroup(
     std::span<const std::byte> payload,
     std::vector<HSteamNetConnection> receivers,
-    const network::ConnectionManager& connections
+    const lightnerx::network::ConnectionManager& connections
 ) {
-    const auto totalSize = sizeof(communication::Event) + payload.size();
+    const auto totalSize = sizeof(lightnerx::communication::Event) + payload.size();
     if (totalSize > 0x7fff) {
         return std::unexpected(std::make_error_code(std::errc::message_size));
     }
 
-    const communication::Event event{
+    const lightnerx::communication::Event event{
         static_cast<std::uint16_t>(totalSize << 1),
         47
     };
 
-    auto outbound = communication::event2OutboundMessage(
+    auto outbound = lightnerx::communication::event2OutboundMessage(
         event,
         payload,
-        network::Target::group(std::move(receivers))
+        lightnerx::network::Target::group(std::move(receivers))
     );
 
     const std::span<const std::byte> bytes{
@@ -215,7 +215,7 @@ std::expected<void, std::error_code> sendEventToGroup(
         static_cast<std::size_t>(outbound.message->m_cbSize)
     };
 
-    const auto queued = network::queueMessage(
+    const auto queued = lightnerx::network::queueMessage(
         bytes,
         std::move(outbound.target)
     );
@@ -225,7 +225,7 @@ std::expected<void, std::error_code> sendEventToGroup(
         return queued;
     }
 
-    return network::flushAll(connections);
+    return lightnerx::network::flushAll(connections);
 }
 ```
 
@@ -236,15 +236,15 @@ std::expected<void, std::error_code> sendEventToGroup(
 Com handles obtidos pelo cliente ou pelos callbacks de conexão do servidor, os destinos disponíveis são:
 
 ```cpp
-auto oneClient = network::Target::single(connection);
-auto selectedClients = network::Target::group({firstConnection, secondConnection});
-auto everyone = network::Target::broadcast();
-auto everyoneElse = network::Target::broadcast({connectionToSkip});
+auto oneClient = lightnerx::network::Target::single(connection);
+auto selectedClients = lightnerx::network::Target::group({firstConnection, secondConnection});
+auto everyone = lightnerx::network::Target::broadcast();
+auto everyoneElse = lightnerx::network::Target::broadcast({connectionToSkip});
 ```
 
 Essas chamadas apenas descrevem destinos. Você pode enfileirar várias mensagens e executar `flushAll(connections)` ao final de uma etapa da aplicação; o flush imediato mostrado na função é uma escolha do exemplo.
 
 ## Próximos passos
 
-- Consulte [Comunicação e protocolo INER](communication.md) para entender os cabeçalhos, destinos e fluxos de envio.
+- Consulte [Comunicação e protocolo INER](lightnerx.communication.md) para entender os cabeçalhos, destinos e fluxos de envio.
 - Consulte [Referência da API](api.md) para os componentes de rede, mensagens, `Target` e batcher.

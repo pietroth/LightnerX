@@ -2,11 +2,11 @@ module;
 
 #include "steam/steamnetworkingtypes.h"
 
-export module network.target;
+export module lightnerx.network.target;
 
 import std;
 
-export namespace network {
+export namespace lightnerx::network {
     struct Target {
         std::variant<std::monostate, std::vector<HSteamNetConnection>, HSteamNetConnection> connection;
         std::vector<HSteamNetConnection> broadcastExceptions;

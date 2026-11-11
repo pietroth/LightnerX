@@ -2,9 +2,9 @@ module;
 
 #include <steam/steamnetworkingsockets.h>
 
-export module network.network_manager;
+export module lightnerx.network.network_manager;
 
-export namespace network {
+export namespace lightnerx::network {
     bool g_bNetworkInitialized = false;
 
     bool networkInit() {

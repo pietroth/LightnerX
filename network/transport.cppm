@@ -4,21 +4,21 @@ module;
 #include "steam/steamclientpublic.h"
 #include "steam/steamnetworkingtypes.h"
 
-export module network.transport;
+export module lightnerx.network.transport;
 
 import std;
 
-import network.connection_manager;
-import network.network_manager;
+import lightnerx.network.connection_manager;
+import lightnerx.network.network_manager;
 
-export namespace network {
+export namespace lightnerx::network {
     constexpr HSteamNetConnection k_invalidConnection = 0;
 
     std::expected<void, std::error_code> sendToConnection(
         const std::span<const std::byte> message,
         const HSteamNetConnection hConn
     ) {
-        if (!network::isNetworkInitialized()) {
+        if (!lightnerx::network::isNetworkInitialized()) {
             return std::unexpected(std::make_error_code(std::errc::resource_unavailable_try_again));
         }
 
@@ -70,7 +70,7 @@ export namespace network {
 
     std::expected<void, std::error_code> broadcast(
         const std::span<const std::byte> message,
-        const network::ConnectionManager& connectionManager,
+        const lightnerx::network::ConnectionManager& connectionManager,
         const std::vector<HSteamNetConnection> exceptions
     ) {
         std::optional<std::error_code> error;

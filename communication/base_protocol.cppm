@@ -1,10 +1,10 @@
 module;
 
-export module communication.base_protocol;
+export module lightnerx.communication.base_protocol;
 
 import std;
 
-export namespace communication {
+export namespace lightnerx::communication {
     #pragma pack(push, 1)
     struct BaseProtocol {
         std::uint16_t size;

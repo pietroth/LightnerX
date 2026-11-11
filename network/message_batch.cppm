@@ -3,15 +3,15 @@ module;
 #include "steam/isteamnetworkingutils.h"
 #include <steam/steamnetworkingtypes.h>
 
-export module network.message_batch;
+export module lightnerx.network.message_batch;
 
 import std;
 
-import network.transport;
-import network.target;
-import network.connection_manager;
+import lightnerx.network.transport;
+import lightnerx.network.target;
+import lightnerx.network.connection_manager;
 
-namespace network {
+namespace lightnerx::network {
     export struct OutboundMessage {
         SteamNetworkingMessage_t* message;
         Target target;
@@ -63,17 +63,17 @@ namespace network {
             std::expected<void, std::error_code> result;
 
             if (message.target.isSingle()) {
-                result = network::sendToConnection(
+                result = lightnerx::network::sendToConnection(
                     data,
                     std::get<HSteamNetConnection>(message.target.connection)
                 );
             } else if (std::holds_alternative<std::vector<HSteamNetConnection>>(message.target.connection)) {
-                result = network::sendToConnections(
+                result = lightnerx::network::sendToConnections(
                     data,
                     std::get<std::vector<HSteamNetConnection>>(message.target.connection)
                 );
             } else {
-                result = network::broadcast(
+                result = lightnerx::network::broadcast(
                     data,
                     connectionManager,
                     message.target.broadcastExceptions

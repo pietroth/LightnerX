@@ -1,14 +1,14 @@
 module;
 
-export module communication.notification;
+export module lightnerx.communication.notification;
 
 import std;
 
-import communication.base_protocol;
-import communication.mbt;
+import lightnerx.communication.base_protocol;
+import lightnerx.communication.mbt;
 
-export namespace communication {
-    using namespace communication;
+export namespace lightnerx::communication {
+    using namespace lightnerx::communication;
 
     #pragma pack(push, 1)
     struct Notification {

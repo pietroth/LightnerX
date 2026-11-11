@@ -5,13 +5,13 @@ module;
 #include <steam/steamnetworkingsockets.h>
 #include <steam/isteamnetworkingutils.h>
 
-export module network.server;
+export module lightnerx.network.server;
 
 import std;
 
-import network.network_manager;
+import lightnerx.network.network_manager;
 
-export namespace network {
+export namespace lightnerx::network {
     constexpr HSteamListenSocket k_invalidSocket = 0;
     constexpr HSteamNetPollGroup k_invalidPollGroup = 0;
 
@@ -44,7 +44,7 @@ export namespace network {
         }
 
         std::expected<void, std::error_code> start(int port, uint32_t timeoutConnected) {
-            if (!network::networkInit()) {
+            if (!lightnerx::network::networkInit()) {
                 return std::unexpected(
                     std::make_error_code(std::errc::io_error)
                 );
@@ -127,7 +127,7 @@ export namespace network {
         std::expected<void, std::error_code> disconnectConnection(
             HSteamNetConnection hConn, bool enableLinger
         ) {
-            if (!network::isNetworkInitialized()) {
+            if (!lightnerx::network::isNetworkInitialized()) {
                 return std::unexpected(
                     std::make_error_code(std::errc::not_connected)
                 );
