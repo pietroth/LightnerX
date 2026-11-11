@@ -24,29 +24,19 @@ namespace lightnerx::network {
     }
 
     export std::expected<void, std::error_code> queueMessage(
-        const std::span<const std::byte> message,
-        Target target
+        OutboundMessage message
     ) {
+        if (message.message == nullptr) {
+            return std::unexpected(std::make_error_code(std::errc::invalid_argument));
+        }
+
         if (messages.size() >= messages.capacity()) {
+            message.message->Release();
             return std::unexpected(std::make_error_code(std::errc::not_enough_memory));
         }
 
-        SteamNetworkingMessage_t* networkingMessage = SteamNetworkingUtils()->AllocateMessage(
-            static_cast<int>(message.size())
-        );
-
-        if (networkingMessage != nullptr) {
-            std::memcpy(networkingMessage->m_pData, message.data(), message.size());
-
-            messages.push_back(OutboundMessage{
-                networkingMessage,
-                std::move(target)
-            });
-
-            return {};
-        }
-
-        return std::unexpected(std::make_error_code(std::errc::not_enough_memory));
+        messages.push_back(std::move(message));
+        return {};
     }
 
     export std::expected<void, std::error_code> flushAll(

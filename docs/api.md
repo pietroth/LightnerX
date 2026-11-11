@@ -240,7 +240,7 @@ lightnerx::network::OutboundMessage notification2OutboundMessage(
 
 Os conversores alocam um `SteamNetworkingMessage_t`, copiam o cabeçalho e acrescentam o payload. O objeto retornado contém o ponteiro `message` e o `target` de destino.
 
-Inicialize a rede antes de usá-los. O chamador preenche o campo `size` conforme a [representação binária](lightnerx.communication.md#representação-binária) e é responsável por chamar `Release()` no objeto criado. Para respostas aprovadas, negadas ou de falha, forneça `{}` como payload; para aprovação parcial, forneça os bytes definidos pela aplicação.
+Inicialize a rede antes de usá-los. O chamador preenche o campo `size` conforme a [representação binária](communication.md#representação-binária) e entrega o objeto criado a `queueMessage`, que assume sua propriedade. Se o objeto nunca for entregue à fila, o chamador deve liberá-lo com `Release()`. Para respostas aprovadas, negadas ou de falha, forneça `{}` como payload; para aprovação parcial, forneça os bytes definidos pela aplicação.
 
 ## `lightnerx.network.network_manager`
 
@@ -474,10 +474,7 @@ struct OutboundMessage {
 ```cpp
 void initMessagesBatcher(int capacity);
 
-std::expected<void, std::error_code> queueMessage(
-    std::span<const std::byte> message,
-    Target target
-);
+std::expected<void, std::error_code> queueMessage(OutboundMessage message);
 
 std::expected<void, std::error_code> flushAll(
     const ConnectionManager& connectionManager
@@ -486,11 +483,11 @@ std::expected<void, std::error_code> flushAll(
 
 `initMessagesBatcher` reserva espaço na fila compartilhada do batcher. Chame-o antes de enfileirar, com a quantidade de mensagens que deseja poder manter pendentes; essa reserva não esvazia uma fila existente.
 
-`queueMessage` copia os bytes e armazena o destino. Retorna `std::errc::not_enough_memory` quando a capacidade reservada está ocupada ou a alocação da mensagem interna falha. O parâmetro `Target` é recebido por valor: passar um destino existente sem `std::move` o copia; usar `std::move` permite transferir seus vetores.
+`queueMessage` recebe um `OutboundMessage` por valor e o move para a fila. A mensagem alocada pelo conversor é mantida, sem outra alocação de mensagem nem cópia dos bytes. Se a capacidade reservada estiver ocupada, libera a mensagem recebida e retorna `std::errc::not_enough_memory`. Se `message.message` for nulo, retorna `std::errc::invalid_argument` sem enfileirar.
 
 `flushAll` processa cada mensagem separadamente com envio individual, para grupo ou broadcast. O `ConnectionManager` é um argumento obrigatório e fornece os destinatários dos broadcasts. A função libera todas as mensagens internas e esvazia a fila mesmo quando há erros, retornando o último erro entre as operações de envio. Uma fila vazia retorna sucesso.
 
-A mensagem apontada por `OutboundMessage::message` continua sob propriedade do chamador. Depois que `queueMessage` retorna, libere essa mensagem uma única vez com `Release()`, inclusive quando o retorno indica erro. Isso libera o original e seu buffer; a cópia do batcher permanece válida. `std::move(outbound.target)` transfere somente o destino e não altera o ponteiro da mensagem original. Depois de `Release()`, não acesse esse ponteiro nem o span construído sobre ele.
+A chamada de `queueMessage` consome a mensagem, tanto no sucesso quanto no erro. Passe um objeto existente com `std::move(outbound)` ou use diretamente o resultado de um conversor. Depois disso, não acesse, libere nem enfileire novamente a mensagem. `OutboundMessage` contém um ponteiro bruto: `std::move` permite mover o destino, mas não zera automaticamente o ponteiro no objeto original. Copiar o objeto também não duplica a mensagem; por isso, não entregue cópias da mesma mensagem à fila. Se nunca entregar uma mensagem criada à fila, libere-a uma única vez com `Release()`.
 
 Com a rede e o batcher inicializados, e `event`, `payload`, `connection` e `connections` definidos pela aplicação, o uso típico após um conversor é:
 
@@ -501,16 +498,7 @@ auto outbound = lightnerx::communication::event2OutboundMessage(
     lightnerx::network::Target::single(connection)
 );
 
-const std::span<const std::byte> bytes{
-    static_cast<const std::byte*>(outbound.message->m_pData),
-    static_cast<std::size_t>(outbound.message->m_cbSize)
-};
-
-const auto queued = lightnerx::network::queueMessage(
-    bytes,
-    std::move(outbound.target)
-);
-outbound.message->Release();
+const auto queued = lightnerx::network::queueMessage(std::move(outbound));
 
 if (!queued) {
     std::println("Falha ao enfileirar: {}", queued.error().message());

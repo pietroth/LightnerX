@@ -210,16 +210,7 @@ std::expected<void, std::error_code> sendEventToGroup(
         lightnerx::network::Target::group(std::move(receivers))
     );
 
-    const std::span<const std::byte> bytes{
-        static_cast<const std::byte*>(outbound.message->m_pData),
-        static_cast<std::size_t>(outbound.message->m_cbSize)
-    };
-
-    const auto queued = lightnerx::network::queueMessage(
-        bytes,
-        std::move(outbound.target)
-    );
-    outbound.message->Release();
+    const auto queued = lightnerx::network::queueMessage(std::move(outbound));
 
     if (!queued) {
         return queued;
@@ -229,9 +220,9 @@ std::expected<void, std::error_code> sendEventToGroup(
 }
 ```
 
-`queueMessage` copia os bytes para uma mensagem interna do batcher. Por isso, a mensagem criada pelo conversor continua sendo de propriedade do chamador e deve receber `Release()` depois que `queueMessage` terminar, inclusive se o enfileiramento retornar um erro.
+`queueMessage` recebe o `OutboundMessage` criado pelo conversor e assume a propriedade da mensagem e de seu destino, sem realocar a mensagem nem copiar seus bytes. Se a fila estiver cheia, a chamada libera a mensagem imediatamente e retorna erro. Se o enfileiramento for aceito, `flushAll` libera a mensagem após a tentativa de envio.
 
-`std::move(outbound.target)` transfere somente o destino. Trate esse destino como consumido e crie outro `Target` para um novo envio. O ponteiro `outbound.message` permanece válido até `Release()`; após essa chamada, nem o ponteiro nem o span `bytes` devem ser acessados. O cabeçalho e o payload fornecidos ao conversor continuam pertencendo à aplicação.
+Passe um objeto existente com `std::move(outbound)` ou entregue diretamente o resultado do conversor a `queueMessage`. Depois da chamada, não acesse, libere nem enfileire novamente a mensagem consumida, inclusive em caso de erro. Como `message` é um ponteiro bruto, `std::move` não o torna automaticamente nulo no objeto original. O cabeçalho e o payload fornecidos ao conversor continuam pertencendo à aplicação.
 
 Com handles obtidos pelo cliente ou pelos callbacks de conexão do servidor, os destinos disponíveis são:
 
@@ -246,5 +237,5 @@ Essas chamadas apenas descrevem destinos. Você pode enfileirar várias mensagen
 
 ## Próximos passos
 
-- Consulte [Comunicação e protocolo INER](lightnerx.communication.md) para entender os cabeçalhos, destinos e fluxos de envio.
+- Consulte [Comunicação e protocolo INER](communication.md) para entender os cabeçalhos, destinos e fluxos de envio.
 - Consulte [Referência da API](api.md) para os componentes de rede, mensagens, `Target` e batcher.

@@ -164,9 +164,8 @@ O fluxo comum é:
 2. Construir o cabeçalho com o tamanho total da mensagem.
 3. Criar um `lightnerx::network::Target`.
 4. Usar o conversor correspondente para obter um `lightnerx::network::OutboundMessage`.
-5. Chamar `queueMessage(bytes, std::move(outbound.target))`, que copia os bytes para a fila.
-6. Liberar a mensagem original com `outbound.message->Release()`, inclusive se o enfileiramento retornar erro.
-7. Verificar o resultado do enfileiramento e chamar `flushAll(connectionManager)` no momento escolhido pela aplicação.
+5. Entregar o objeto a `queueMessage(std::move(outbound))`, transferindo a propriedade da mensagem e do destino.
+6. Verificar o resultado do enfileiramento e chamar `flushAll(connectionManager)` no momento escolhido pela aplicação. A liberação da mensagem passa a ser responsabilidade do batcher, inclusive quando o enfileiramento retorna erro.
 
 Exemplo de um `Event` da Autoridade com um byte de payload definido pela aplicação. A função pressupõe a rede e o batcher inicializados e permite broadcast com ou sem exceções:
 
@@ -197,13 +196,7 @@ std::expected<void, std::error_code> broadcastEvent(
         lightnerx::network::Target::broadcast(std::move(exceptions))
     );
 
-    const std::span<const std::byte> bytes{
-        static_cast<const std::byte*>(outbound.message->m_pData),
-        static_cast<std::size_t>(outbound.message->m_cbSize)
-    };
-
-    const auto queued = lightnerx::network::queueMessage(bytes, std::move(outbound.target));
-    outbound.message->Release();
+    const auto queued = lightnerx::network::queueMessage(std::move(outbound));
 
     if (!queued) {
         return queued;
@@ -216,9 +209,9 @@ Chame `broadcastEvent(connections)` para todos ou `broadcastEvent(connections, {
 
 ### O que cada etapa faz
 
-`queueMessage` aloca uma mensagem interna e copia os bytes recebidos. O `std::move` aplicado a `outbound.target` transfere somente o destino. A chamada de `Release()` libera a mensagem original e seu buffer; a cópia enfileirada continua válida. Após liberar o original, não acesse `outbound.message` nem o span `bytes` construído sobre ele.
+`queueMessage` recebe o `OutboundMessage` do conversor e armazena a mesma mensagem com seu destino, sem nova alocação de mensagem nem cópia dos bytes. A chamada consome a mensagem: no sucesso, o batcher a mantém até o flush; se a fila estiver cheia, ele a libera imediatamente. O chamador não deve chamar `Release()` nem reutilizar a mensagem depois de entregá-la à fila. Um ponteiro nulo é rejeitado com `invalid_argument`.
 
-`flushAll` percorre as mensagens pendentes, encaminha cada uma conforme seu destino e libera sua cópia interna. Todas as entradas são processadas e a fila é esvaziada mesmo quando há erros de envio. O retorno informa sucesso ou o último erro encontrado entre essas operações.
+`flushAll` percorre as mensagens pendentes, encaminha cada uma conforme seu destino e libera a mensagem recebida do conversor com `Release()`. Todas as entradas são processadas e a fila é esvaziada mesmo quando há erros de envio. O retorno informa sucesso ou o último erro encontrado entre essas operações.
 
 O batching permite acumular várias mensagens antes de um flush. Cada entrada continua sendo uma mensagem separada; os payloads não são concatenados. A aplicação decide quando fazer o flush, por exemplo ao final de uma atualização. O sucesso indica que o transporte aceitou as operações de envio, sem confirmar o processamento no destinatário.
 

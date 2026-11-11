@@ -31,5 +31,5 @@ No LightnerX, a aplicação conecta os componentes por callbacks: a rede entrega
 
 - [Configuração](docs/setup.md)
 - [Primeiros passos](docs/first-steps.md)
-- [Comunicação e protocolo INER](docs/lightnerx.communication.md)
+- [Comunicação e protocolo INER](docs/communication.md)
 - [Referência da API](docs/api.md)
