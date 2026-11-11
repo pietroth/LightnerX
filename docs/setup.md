@@ -1,13 +1,13 @@
-# Configuração
+# Setup
 
-O LightnerX é uma biblioteca estática em C++. O projeto fornece a target `LightnerX` e não possui executável próprio.
+LightnerX is a static C++ library. The project provides the `LightnerX` target and does not have its own executable.
 
 ## GameNetworkingSockets
 
-O GameNetworkingSockets é mantido como submódulo em `external/GameNetworkingSockets`. Depois de obter o repositório, execute na raiz do LightnerX:
+GameNetworkingSockets is maintained as a submodule in `external/GameNetworkingSockets`. After obtaining the repository, run the following from the LightnerX root directory:
 
 ```bash
 git submodule update --init --recursive
 ```
 
-Esse comando obtém o GameNetworkingSockets e seus submódulos recursivos no estado esperado pelo LightnerX.
+This command retrieves GameNetworkingSockets and its recursive submodules in the state expected by LightnerX.

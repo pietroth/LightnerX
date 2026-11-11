@@ -1,47 +1,47 @@
-# Referência da API
+# API reference
 
-Esta página apresenta os componentes públicos agrupados por módulo. Todos os módulos são importados com `import` e pertencem aos namespaces indicados.
+This page presents the public components grouped by module. All modules are imported with `import` and belong to the indicated namespaces.
 
-As operações que retornam `std::expected<void, std::error_code>` podem ser verificadas com `if (!result)`. Em caso de erro, `result.error()` fornece o código e `result.error().message()` fornece sua descrição. Os exemplos completos estão em [Primeiros passos](first-steps.md).
+Operations that return `std::expected<void, std::error_code>` can be checked with `if (!result)`. In the event of an error, `result.error()` provides the code and `result.error().message()` provides its description. Complete examples are available in [First steps](first-steps.md).
 
 ## `lightnerx.communication.base_protocol`
 
 ### `lightnerx::communication::BaseProtocol`
 
-Estrutura base dos cabeçalhos.
+Base structure for headers.
 
 ```cpp
 BaseProtocol(std::uint16_t size);
 ```
 
-- `size`: na construção para envio, tamanho codificado da mensagem da Autoridade ou tamanho total da mensagem do Obediente. O interpretador entrega esse campo com o tamanho já decodificado.
-- Campo público: `std::uint16_t size`.
+- `size`: when constructing a message for sending, the encoded size of the Authority's message or the total size of the Obedient's message. The interpreter delivers this field with the size already decoded.
+- Public field: `std::uint16_t size`.
 
 ## `lightnerx.communication.mbt`
 
 ### `lightnerx::communication::MBT`
 
-Armazena o identificador semântico da mensagem.
+Stores the message's semantic identifier.
 
 ```cpp
 MBT(std::uint16_t type);
 ```
 
-- Campo público: `std::uint16_t type`.
+- Public field: `std::uint16_t type`.
 
-## Tipos de mensagem
+## Message types
 
 ### `lightnerx.communication.event`
 
 ### `lightnerx::communication::Event`
 
-Cabeçalho de um evento da Autoridade.
+Header for an event from the Authority.
 
 ```cpp
 Event(std::uint16_t size, std::uint16_t typeId);
 ```
 
-Campos públicos:
+Public fields:
 
 - `protocol`: `BaseProtocol`;
 - `mbt`: `MBT`.
@@ -50,20 +50,20 @@ Campos públicos:
 
 ### `lightnerx::communication::Notification`
 
-Cabeçalho de uma notificação do Obediente.
+Header for a notification from the Obedient.
 
 ```cpp
 Notification(std::uint16_t size, std::uint16_t type);
 ```
 
-Campos públicos:
+Public fields:
 
 - `protocol`: `BaseProtocol`;
 - `mbt`: `MBT`.
 
 ### `lightnerx::communication::NotificationRegistry`
 
-Registra IDs que devem ser interpretados como `Notification` pelo servidor.
+Registers IDs that the server should interpret as `Notification`.
 
 ```cpp
 void registerId(std::uint16_t id);
@@ -71,13 +71,13 @@ void registerIds(std::unordered_set<std::uint16_t>&& newIds);
 bool exist(std::uint16_t id) const noexcept;
 ```
 
-`registerId` adiciona um ID e `registerIds` incorpora os IDs de um conjunto passado como temporário ou com `std::move`. `exist()` informa se o ID está registrado. O registro é fornecido pela aplicação a `obedientInterpret`.
+`registerId` adds an ID, and `registerIds` incorporates the IDs from a set passed as a temporary or with `std::move`. `exist()` reports whether the ID is registered. The application provides the registry to `obedientInterpret`.
 
 ### `lightnerx.communication.intention`
 
 ### `lightnerx::communication::Intention`
 
-Cabeçalho de uma intenção enviada à Autoridade.
+Header for an intention sent to the Authority.
 
 ```cpp
 Intention(
@@ -87,17 +87,17 @@ Intention(
 );
 ```
 
-Campos públicos:
+Public fields:
 
 - `protocol`: `BaseProtocol`;
 - `mbt`: `MBT`;
-- `correlationId`: identificador usado para relacionar a resposta.
+- `correlationId`: identifier used to correlate the response.
 
 ### `lightnerx.communication.response`
 
 ### `lightnerx::communication::Response`
 
-Cabeçalho usado para respostas aprovadas ou de falha.
+Header used for approved or failure responses.
 
 ```cpp
 Response(
@@ -107,7 +107,7 @@ Response(
 );
 ```
 
-Campos públicos:
+Public fields:
 
 - `protocol`: `BaseProtocol`;
 - `correlationId`;
@@ -115,7 +115,7 @@ Campos públicos:
 
 ### `lightnerx::communication::UnsuccessfulResponse`
 
-Cabeçalho usado para respostas negadas ou parcialmente aprovadas.
+Header used for denied or partially approved responses.
 
 ```cpp
 UnsuccessfulResponse(
@@ -126,14 +126,14 @@ UnsuccessfulResponse(
 );
 ```
 
-Campos públicos:
+Public fields:
 
 - `protocol`: `BaseProtocol`;
 - `correlationId`;
 - `status`;
 - `reasonCode`.
 
-### Constantes de status
+### Status constants
 
 ```cpp
 constexpr std::uint8_t APPROVED_RESPONSE = 0;
@@ -146,7 +146,7 @@ constexpr std::uint8_t FAILURE_RESPONSE = 3;
 
 ### `lightnerx::communication::Message`
 
-Resultado entregue pelo interpretador.
+Result delivered by the interpreter.
 
 ```cpp
 struct Message {
@@ -161,13 +161,13 @@ struct Message {
 };
 ```
 
-Use `std::visit(visitante, message.header)` para examinar o tipo armazenado em `header`. O cabeçalho é um valor; o `payload` referencia o buffer fornecido ao interpretador. Para usar o payload depois do callback de recebimento, copie os bytes para armazenamento da aplicação.
+Use `std::visit(visitor, message.header)` to examine the type stored in `header`. The header is a value; `payload` references the buffer provided to the interpreter. To use the payload after the receive callback, copy the bytes into application storage.
 
 ### `lightnerx::communication::MessageInterpreter`
 
-Interpreta bytes recebidos e chama os callbacks registrados, na ordem de registro e durante a própria chamada de interpretação. É possível registrar mais de um callback. Lambdas que capturam objetos por referência precisam que esses objetos permaneçam vivos durante a execução dos callbacks.
+Interprets received bytes and calls registered callbacks in registration order, during the interpretation call itself. More than one callback can be registered. Lambdas that capture objects by reference require those objects to remain alive while the callbacks run.
 
-#### Registro de callbacks
+#### Callback registration
 
 ```cpp
 void addAuthorityInterpretedMessageCallback(
@@ -179,9 +179,9 @@ void addObedientInterpretedMessageCallback(
 );
 ```
 
-O callback registrado com `addAuthorityInterpretedMessageCallback` recebe mensagens enviadas pela Autoridade, normalmente no cliente. O registrado com `addObedientInterpretedMessageCallback` recebe mensagens enviadas pelo Obediente, normalmente no servidor, acompanhadas do ID interno do cliente.
+The callback registered with `addAuthorityInterpretedMessageCallback` receives messages sent by the Authority, typically on the client. The one registered with `addObedientInterpretedMessageCallback` receives messages sent by the Obedient, typically on the server, along with the internal client ID.
 
-#### Interpretação no servidor
+#### Interpretation on the server
 
 ```cpp
 void obedientInterpret(
@@ -192,19 +192,19 @@ void obedientInterpret(
 );
 ```
 
-Interpreta mensagens enviadas pelo Obediente. IDs encontrados no registro são tratados como `Notification`; os demais são tratados como `Intention`. `hConn` identifica a conexão de origem e `connManager` fornece sua associação com o ID interno. Mantenha essa associação atualizada ao conectar e desconectar clientes. A assinatura recebe especificamente `lightnerx::network::ConnectionManager`.
+Interprets messages sent by the Obedient. IDs found in the registry are treated as `Notification`; the others are treated as `Intention`. `hConn` identifies the source connection, and `connManager` provides its mapping to the internal ID. Keep this mapping up to date when connecting and disconnecting clients. The signature specifically takes `lightnerx::network::ConnectionManager`.
 
-#### Interpretação no cliente
+#### Interpretation on the client
 
 ```cpp
 void authorityInterpret(std::span<const std::byte> data);
 ```
 
-Interpreta `Event` e respostas enviadas pela Autoridade. O bit de tipo seleciona evento ou resposta; o status seleciona `Response` ou `UnsuccessfulResponse`. Os status aprovado e falha entregam payload vazio; negativa e aprovação parcial entregam os bytes após `UnsuccessfulResponse`.
+Interprets `Event` and responses sent by the Authority. The type bit selects event or response; the status selects `Response` or `UnsuccessfulResponse`. The approved and failure statuses deliver an empty payload; denial and partial approval deliver the bytes following `UnsuccessfulResponse`.
 
-### Conversores para saída
+### Outbound converters
 
-As funções abaixo retornam `lightnerx::network::OutboundMessage`:
+The functions below return `lightnerx::network::OutboundMessage`:
 
 ```cpp
 lightnerx::network::OutboundMessage event2OutboundMessage(
@@ -238,13 +238,13 @@ lightnerx::network::OutboundMessage notification2OutboundMessage(
 );
 ```
 
-Os conversores alocam um `SteamNetworkingMessage_t`, copiam o cabeçalho e acrescentam o payload. O objeto retornado contém o ponteiro `message` e o `target` de destino.
+The converters allocate a `SteamNetworkingMessage_t`, copy the header, and append the payload. The returned object contains the `message` pointer and the destination `target`.
 
-Inicialize a rede antes de usá-los. O chamador preenche o campo `size` conforme a [representação binária](communication.md#representação-binária) e entrega o objeto criado a `queueMessage`, que assume sua propriedade. Se o objeto nunca for entregue à fila, o chamador deve liberá-lo com `Release()`. Para respostas aprovadas, negadas ou de falha, forneça `{}` como payload; para aprovação parcial, forneça os bytes definidos pela aplicação.
+Initialize the network before using them. The caller fills in the `size` field according to the [binary representation](communication.md#binary-representation) and passes the created object to `queueMessage`, which takes ownership of it. If the object is never passed to the queue, the caller must release it with `Release()`. For approved, denied, or failure responses, provide `{}` as the payload; for partial approval, provide the bytes defined by the application.
 
 ## `lightnerx.network.network_manager`
 
-Funções de controle do estado global da rede:
+Functions for controlling the global network state:
 
 ```cpp
 bool networkInit();
@@ -252,13 +252,13 @@ void networkKill();
 bool isNetworkInitialized();
 ```
 
-`networkInit()` inicializa o GameNetworkingSockets e retorna `true` quando a inicialização é bem-sucedida ou já foi registrada. `isNetworkInitialized()` consulta esse estado. `networkKill()` encerra a rede e limpa o estado mantido por esse módulo. `Server::start()` e `Client::start()` já chamam `networkInit()`.
+`networkInit()` initializes GameNetworkingSockets and returns `true` when initialization succeeds or has already been registered. `isNetworkInitialized()` queries this state. `networkKill()` shuts down the network and clears the state maintained by this module. `Server::start()` and `Client::start()` already call `networkInit()`.
 
 ## `lightnerx.network.server`
 
 ### `lightnerx::network::Server`
 
-Servidor baseado em socket de escuta e grupo de polling.
+Server based on a listen socket and a poll group.
 
 #### Callbacks
 
@@ -279,7 +279,7 @@ void addClientReceivedMessageCallback(
 );
 ```
 
-#### Ciclo de vida
+#### Lifecycle
 
 ```cpp
 std::expected<void, std::error_code> start(
@@ -297,17 +297,17 @@ std::expected<void, std::error_code> disconnectConnection(
 void close();
 ```
 
-`start()` inicializa a rede e abre o socket de escuta na porta informada; `timeoutConnected` é passado ao GameNetworkingSockets em milissegundos. Após um início bem-sucedido, `update()` processa callbacks da rede e até uma mensagem disponível no grupo de polling.
+`start()` initializes the network and opens the listen socket on the specified port; `timeoutConnected` is passed to GameNetworkingSockets in milliseconds. After a successful start, `update()` processes network callbacks and up to one available message in the poll group.
 
-O callback de conexão é chamado após a aceitação e associação ao grupo de polling. O de recebimento fornece os bytes e o handle da origem. Os bytes permanecem válidos durante esses callbacks.
+The connection callback is called after acceptance and assignment to the poll group. The receive callback provides the bytes and the source handle. The bytes remain valid during these callbacks.
 
-`disconnectConnection()` solicita o encerramento de uma conexão específica e, em caso de sucesso, chama os callbacks de desconexão. `enableLinger` é repassado ao transporte para controlar a tentativa de envio dos dados pendentes ao fechar. `close()` fecha o socket de escuta, destrói o grupo de polling e encerra o GameNetworkingSockets.
+`disconnectConnection()` requests that a specific connection be closed and, on success, calls the disconnection callbacks. `enableLinger` is forwarded to the transport to control the attempt to send pending data when closing. `close()` closes the listen socket, destroys the poll group, and shuts down GameNetworkingSockets.
 
 ## `lightnerx.network.client`
 
 ### `lightnerx::network::Client`
 
-Cliente que conecta a um endereço IP e processa mensagens da conexão com o servidor.
+Client that connects to an IP address and processes messages from the connection to the server.
 
 ```cpp
 void addServerReceivedMessageCallback(
@@ -333,17 +333,17 @@ bool isConnected() const noexcept;
 HSteamNetConnection getServerHConn() const noexcept;
 ```
 
-`start()` inicializa o transporte. `connect()` inicia a conexão para o endereço IP e a porta informados; acompanhe `isConnected()` enquanto chama `update()` para observar o estabelecimento da conexão. `update()` executa os callbacks da rede e processa até o número indicado de mensagens; valores menores ou iguais a zero executam somente os callbacks da rede.
+`start()` initializes the transport. `connect()` initiates the connection to the specified IP address and port; monitor `isConnected()` while calling `update()` to observe the connection being established. `update()` runs network callbacks and processes up to the specified number of messages; values less than or equal to zero run only the network callbacks.
 
-`getServerHConn()` retorna o handle usado para enviar mensagens ao servidor, por exemplo com `Target::single(client.getServerHConn())`. O callback de recebimento é armazenado pelo cliente, e o span fornecido permanece válido durante sua execução.
+`getServerHConn()` returns the handle used to send messages to the server, for example with `Target::single(client.getServerHConn())`. The receive callback is stored by the client, and the provided span remains valid during its execution.
 
-`disconnect()` solicita o encerramento da conexão e repassa `enableLinger` ao transporte. O destrutor fecha a conexão existente e encerra o GameNetworkingSockets inicializado pelo cliente.
+`disconnect()` requests that the connection be closed and forwards `enableLinger` to the transport. The destructor closes the existing connection and shuts down the GameNetworkingSockets instance initialized by the client.
 
 ## `lightnerx.network.connection_manager`
 
 ### `lightnerx::network::ConnectionManager`
 
-Mantém a associação entre IDs internos e handles de conexão.
+Maintains the mapping between internal IDs and connection handles.
 
 ```cpp
 ConnectionManager(int initialReserve, int maxCapacity);
@@ -364,23 +364,23 @@ int getOnlineCount() const noexcept;
 void forEach(const auto& callback) const noexcept;
 ```
 
-`initialReserve` reserva espaço para armazenamento e `maxCapacity` define a quantidade máxima de conexões registradas. `add` registra um handle e retorna o ID atribuído, ou um `std::optional` vazio quando o registro não é realizado. `remove` desfaz o registro do ID; o encerramento da conexão é feito pelo componente de rede.
+`initialReserve` reserves storage space, and `maxCapacity` defines the maximum number of registered connections. `add` registers a handle and returns the assigned ID, or an empty `std::optional` when registration is not performed. `remove` unregisters the ID; closing the connection is handled by the networking component.
 
-`getHSteamNetConnection` consulta um handle pelo ID interno e retorna `0` quando não há handle nessa posição. `getClientId` consulta o ID associado ao handle no GameNetworkingSockets. `getOnlineCount` retorna a quantidade de registros ativos.
+`getHSteamNetConnection` looks up a handle by its internal ID and returns `0` when there is no handle at that position. `getClientId` looks up the ID associated with the handle in GameNetworkingSockets. `getOnlineCount` returns the number of active registrations.
 
-`forEach` chama o callback para cada registro ativo, fornecendo o ID e o handle:
+`forEach` calls the callback for each active registration, providing the ID and handle:
 
 ```cpp
 connections.forEach(
     [](std::uint16_t id, HSteamNetConnection connection) {
-        // Enviar ou examinar a conexão.
+        // Send to or inspect the connection.
     }
 );
 ```
 
 ## `lightnerx.network.transport`
 
-### Envio direto
+### Direct sending
 
 ```cpp
 std::expected<void, std::error_code> sendToConnection(
@@ -389,9 +389,9 @@ std::expected<void, std::error_code> sendToConnection(
 );
 ```
 
-Encaminha os bytes ao GameNetworkingSockets com a opção de envio confiável. O retorno indica se o transporte aceitou o envio. Essa função usa diretamente o transporte, sem passar pela fila do batcher.
+Forwards the bytes to GameNetworkingSockets with the reliable send option. The return value indicates whether the transport accepted the send. This function uses the transport directly, bypassing the batcher queue.
 
-### Envio para grupo
+### Sending to a group
 
 ```cpp
 std::expected<void, std::error_code> sendToConnections(
@@ -400,7 +400,7 @@ std::expected<void, std::error_code> sendToConnections(
 );
 ```
 
-Encaminha os mesmos bytes para cada handle presente no vetor. Tenta todos os destinos e retorna o primeiro erro encontrado, quando houver.
+Forwards the same bytes to each handle in the vector. Attempts all destinations and returns the first error encountered, if any.
 
 ### Broadcast
 
@@ -412,20 +412,20 @@ std::expected<void, std::error_code> broadcast(
 );
 ```
 
-Encaminha os mesmos bytes para as conexões registradas no `ConnectionManager`, exceto os handles presentes em `exceptions`. Tenta todos os destinos selecionados e retorna o primeiro erro encontrado, quando houver. No envio direto, o terceiro argumento é obrigatório; use `{}` para incluir todas as conexões:
+Forwards the same bytes to the connections registered in `ConnectionManager`, except for the handles in `exceptions`. Attempts all selected destinations and returns the first error encountered, if any. For direct sending, the third argument is required; use `{}` to include all connections:
 
 ```cpp
 const auto all = lightnerx::network::broadcast(bytes, connections, {});
 const auto others = lightnerx::network::broadcast(bytes, connections, {connectionToSkip});
 ```
 
-Os exemplos acima são chamadas independentes; verifique o resultado de cada envio utilizado pela aplicação. Para adiar o envio até um flush, use `Target::broadcast` com `queueMessage`.
+The examples above are independent calls; check the result of each send used by the application. To defer sending until a flush, use `Target::broadcast` with `queueMessage`.
 
 ## `lightnerx.network.target`
 
 ### `lightnerx::network::Target`
 
-Representa o destino de uma mensagem enfileirada. Use as fábricas estáticas para criar o destino:
+Represents the destination of a queued message. Use the static factories to create the destination:
 
 ```cpp
 static Target single(HSteamNetConnection conn);
@@ -440,13 +440,13 @@ static Target broadcast(
 [[nodiscard]] bool isSingle() const noexcept;
 ```
 
-- `single` seleciona uma conexão.
-- `group` guarda o vetor de handles informado.
-- `broadcast()` seleciona todas as conexões registradas no `ConnectionManager` usado no flush. `broadcast({handle})` exclui o handle informado; o vetor pode conter várias exceções.
+- `single` selects one connection.
+- `group` stores the provided vector of handles.
+- `broadcast()` selects all connections registered in the `ConnectionManager` used during the flush. `broadcast({handle})` excludes the specified handle; the vector can contain multiple exceptions.
 
-As fábricas apenas descrevem destinos. `isSingle()` informa se o destino é uma conexão individual; `isBroadcast()` informa se é um broadcast. O broadcast consulta as conexões no momento do flush, enquanto o grupo usa a lista armazenada no `Target`.
+The factories only describe destinations. `isSingle()` reports whether the destination is an individual connection; `isBroadcast()` reports whether it is a broadcast. Broadcast queries connections at flush time, while a group uses the list stored in `Target`.
 
-Campos públicos:
+Public fields:
 
 ```cpp
 std::variant<
@@ -481,15 +481,15 @@ std::expected<void, std::error_code> flushAll(
 );
 ```
 
-`initMessagesBatcher` reserva espaço na fila compartilhada do batcher. Chame-o antes de enfileirar, com a quantidade de mensagens que deseja poder manter pendentes; essa reserva não esvazia uma fila existente.
+`initMessagesBatcher` reserves space in the batcher's shared queue. Call it before queuing, with the number of messages you want to be able to keep pending; this reservation does not empty an existing queue.
 
-`queueMessage` recebe um `OutboundMessage` por valor e o move para a fila. A mensagem alocada pelo conversor é mantida, sem outra alocação de mensagem nem cópia dos bytes. Se a capacidade reservada estiver ocupada, libera a mensagem recebida e retorna `std::errc::not_enough_memory`. Se `message.message` for nulo, retorna `std::errc::invalid_argument` sem enfileirar.
+`queueMessage` receives an `OutboundMessage` by value and moves it into the queue. The message allocated by the converter is retained, without allocating another message or copying the bytes. If the reserved capacity is occupied, it releases the received message and returns `std::errc::not_enough_memory`. If `message.message` is null, it returns `std::errc::invalid_argument` without queuing.
 
-`flushAll` processa cada mensagem separadamente com envio individual, para grupo ou broadcast. O `ConnectionManager` é um argumento obrigatório e fornece os destinatários dos broadcasts. A função libera todas as mensagens internas e esvazia a fila mesmo quando há erros, retornando o último erro entre as operações de envio. Uma fila vazia retorna sucesso.
+`flushAll` processes each message separately by sending it to an individual connection, a group, or a broadcast. `ConnectionManager` is a required argument and provides the broadcast recipients. The function releases all internal messages and empties the queue even when errors occur, returning the last error among the send operations. An empty queue returns success.
 
-A chamada de `queueMessage` consome a mensagem, tanto no sucesso quanto no erro. Passe um objeto existente com `std::move(outbound)` ou use diretamente o resultado de um conversor. Depois disso, não acesse, libere nem enfileire novamente a mensagem. `OutboundMessage` contém um ponteiro bruto: `std::move` permite mover o destino, mas não zera automaticamente o ponteiro no objeto original. Copiar o objeto também não duplica a mensagem; por isso, não entregue cópias da mesma mensagem à fila. Se nunca entregar uma mensagem criada à fila, libere-a uma única vez com `Release()`.
+Calling `queueMessage` consumes the message, both on success and on error. Pass an existing object with `std::move(outbound)` or use a converter's result directly. Afterward, do not access, release, or requeue the message. `OutboundMessage` contains a raw pointer: `std::move` allows the destination to be moved, but does not automatically set the pointer to null in the original object. Copying the object does not duplicate the message either; therefore, do not pass copies of the same message to the queue. If you never pass a created message to the queue, release it exactly once with `Release()`.
 
-Com a rede e o batcher inicializados, e `event`, `payload`, `connection` e `connections` definidos pela aplicação, o uso típico após um conversor é:
+With the network and batcher initialized, and `event`, `payload`, `connection`, and `connections` defined by the application, typical usage after a converter is:
 
 ```cpp
 auto outbound = lightnerx::communication::event2OutboundMessage(
@@ -501,10 +501,10 @@ auto outbound = lightnerx::communication::event2OutboundMessage(
 const auto queued = lightnerx::network::queueMessage(std::move(outbound));
 
 if (!queued) {
-    std::println("Falha ao enfileirar: {}", queued.error().message());
+    std::println("Failed to queue: {}", queued.error().message());
 } else if (const auto flushed = lightnerx::network::flushAll(connections); !flushed) {
-    std::println("Falha ao enviar: {}", flushed.error().message());
+    std::println("Failed to send: {}", flushed.error().message());
 }
 ```
 
-Também é possível enfileirar várias mensagens antes de chamar `flushAll`. O batcher mantém cada mensagem separada e o momento do flush é escolhido pela aplicação.
+You can also queue multiple messages before calling `flushAll`. The batcher keeps each message separate, and the application chooses when to flush.

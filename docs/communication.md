@@ -1,82 +1,82 @@
-# Comunicação e protocolo INER
+# Communication and the INER protocol
 
-## INER e LightnerX
+## INER and LightnerX
 
-INER é um protocolo semântico. Ele define o significado e a organização das mensagens, mas não define sockets, endereçamento, threads ou o mecanismo de transmissão.
+INER is a semantic protocol. It defines the meaning and organization of messages, but does not define sockets, addressing, threads, or the transmission mechanism.
 
-O LightnerX implementa os tipos de mensagem do protocolo e oferece componentes de rede baseados em GameNetworkingSockets. A divisão é:
+LightnerX implements the protocol's message types and provides networking components based on GameNetworkingSockets. The division is:
 
-| Responsabilidade | INER | LightnerX |
+| Responsibility | INER | LightnerX |
 | --- | --- | --- |
-| Significado de Event, Response, Intention e Notification | Sim | Representado pelos tipos C++ |
-| Identificação de mensagens | Sim | Campos `MBT::type`, `correlationId` e `status` |
-| Codificação dos cabeçalhos | Sim | Estruturas empacotadas e conversores |
-| Sockets e conexões | Não | `Server`, `Client` e GameNetworkingSockets |
-| Modelo de execução | Não | Escolhido pela aplicação |
+| Meaning of Event, Response, Intention, and Notification | Yes | Represented by C++ types |
+| Message identification | Yes | `MBT::type`, `correlationId`, and `status` fields |
+| Header encoding | Yes | Packed structures and converters |
+| Sockets and connections | No | `Server`, `Client`, and GameNetworkingSockets |
+| Execution model | No | Chosen by the application |
 
-## Papéis
+## Roles
 
-### Autoridade
+### Authority
 
-A Autoridade controla estados internos. Ela recebe `Intention` e `Notification` do Obediente e envia `Event` e `Response`.
+The Authority controls internal states. It receives `Intention` and `Notification` from the Obedient and sends `Event` and `Response`.
 
-No LightnerX, o servidor normalmente interpreta mensagens recebidas com:
+In LightnerX, the server typically interprets received messages with:
 
 ```cpp
 interpreter.obedientInterpret(bytes, registry, connection, connections);
 ```
 
-### Obediente
+### Obedient
 
-O Obediente envia intenções à Autoridade e recebe informações sobre acontecimentos e resultados.
+The Obedient sends intentions to the Authority and receives information about occurrences and results.
 
-No LightnerX, o cliente normalmente interpreta mensagens recebidas com:
+In LightnerX, the client typically interprets received messages with:
 
 ```cpp
 interpreter.authorityInterpret(bytes);
 ```
 
-## Tipos de mensagem
+## Message types
 
 ### Event
 
-`Event` comunica um acontecimento da Autoridade. Seu cabeçalho contém:
+`Event` communicates an occurrence from the Authority. Its header contains:
 
 - `BaseProtocol::size`;
-- `MBT::type`, usado como `type_id`.
+- `MBT::type`, used as `type_id`.
 
-O payload, quando presente, vem depois do cabeçalho.
+The payload, when present, follows the header.
 
 ### Response
 
-`Response` relaciona o resultado a uma intenção por meio de `correlationId` e contém um `status`.
+`Response` relates the result to an intention through `correlationId` and contains a `status`.
 
-Os status são expostos pelas constantes do módulo `lightnerx.communication.response`:
+The statuses are exposed by constants in the `lightnerx.communication.response` module:
 
-| Constante | Valor | Significado | Tipo usado pelo LightnerX |
+| Constant | Value | Meaning | Type used by LightnerX |
 | --- | ---: | --- | --- |
-| `APPROVED_RESPONSE` | `0` | intenção aprovada integralmente | `Response` |
-| `DENIED_RESPONSE` | `1` | intenção negada | `UnsuccessfulResponse` |
-| `PARTIALLY_APPROVED_RESPONSE` | `2` | intenção parcialmente aplicada | `UnsuccessfulResponse` |
-| `FAILURE_RESPONSE` | `3` | erro interno durante o processamento | `Response` |
+| `APPROVED_RESPONSE` | `0` | intention fully approved | `Response` |
+| `DENIED_RESPONSE` | `1` | intention denied | `UnsuccessfulResponse` |
+| `PARTIALLY_APPROVED_RESPONSE` | `2` | intention partially applied | `UnsuccessfulResponse` |
+| `FAILURE_RESPONSE` | `3` | internal error during processing | `Response` |
 
-Uma falha não significa necessariamente que a intenção foi negada; a aplicação pode decidir tentar novamente. `UnsuccessfulResponse` acrescenta `reasonCode` ao cabeçalho de respostas negadas ou parcialmente aprovadas. Na aprovação parcial, o significado do payload é definido pela aplicação.
+A failure does not necessarily mean that the intention was denied; the application may decide to try again. `UnsuccessfulResponse` adds `reasonCode` to the header of denied or partially approved responses. For partial approval, the meaning of the payload is defined by the application.
 
 ### Intention
 
-`Intention` solicita que a Autoridade execute uma ação. Seu cabeçalho contém:
+`Intention` requests that the Authority perform an action. Its header contains:
 
 - `BaseProtocol::size`;
 - `MBT::type`;
 - `correlationId`.
 
-O payload da intenção vem depois desse cabeçalho.
+The intention's payload follows this header.
 
 ### Notification
 
-`Notification` comunica uma informação à Autoridade sem exigir validação de estado, pois não solicita alteração dos estados internos da Autoridade. Seu cabeçalho contém `size` e `type`, seguido pelo payload opcional.
+`Notification` communicates information to the Authority without requiring state validation, since it does not request a change to the Authority's internal states. Its header contains `size` and `type`, followed by the optional payload.
 
-No servidor, o `NotificationRegistry` informa quais `type_id` devem ser interpretados como `Notification`:
+On the server, `NotificationRegistry` specifies which `type_id` values should be interpreted as `Notification`:
 
 ```cpp
 import std;
@@ -88,86 +88,86 @@ void registerNotifications(lightnerx::communication::NotificationRegistry& regis
 }
 ```
 
-Os valores de `type_id` são definidos pela aplicação. Não existe uma tabela universal de tipos INER. Na recepção de mensagens do Obediente, os IDs registrados identificam notificações; os demais identificam intenções. Para enviar notificações, use `notification2OutboundMessage`.
+The `type_id` values are defined by the application. There is no universal table of INER types. When receiving messages from the Obedient, registered IDs identify notifications; the others identify intentions. To send notifications, use `notification2OutboundMessage`.
 
-## Representação binária
+## Binary representation
 
-As estruturas de cabeçalho são empacotadas sem padding adicional por meio de `#pragma pack(push, 1)`. Os conversores copiam os campos na representação nativa da máquina; os participantes devem usar uma representação compatível para esses campos e combinar o formato do payload.
+Header structures are packed without additional padding using `#pragma pack(push, 1)`. The converters copy fields in the machine's native representation; participants must use a compatible representation for these fields and agree on the payload format.
 
-### Mensagens da Autoridade
+### Messages from the Authority
 
-O primeiro campo usa um valor combinado: o bit menos significativo indica se a mensagem é um `Response`, e os quinze bits restantes representam o tamanho.
+The first field uses a combined value: the least significant bit indicates whether the message is a `Response`, and the remaining fifteen bits represent the size.
 
-| Mensagem | Cabeçalho | Conteúdo |
+| Message | Header | Content |
 | --- | --- | --- |
-| `Event` | 2 bytes de `size` combinado + 2 bytes de `type` | payload variável |
-| `Response` | 2 bytes de `size` combinado + 2 bytes de `correlationId` + 1 byte de `status` | sem payload para os status representados por `Response` |
-| `UnsuccessfulResponse` | estrutura de `Response` + 2 bytes de `reasonCode` | payload variável para resposta parcial |
+| `Event` | 2 bytes of combined `size` + 2 bytes of `type` | variable payload |
+| `Response` | 2 bytes of combined `size` + 2 bytes of `correlationId` + 1 byte of `status` | no payload for the statuses represented by `Response` |
+| `UnsuccessfulResponse` | `Response` structure + 2 bytes of `reasonCode` | variable payload for a partial response |
 
-Na construção do cabeçalho, o valor combinado segue a forma:
+When constructing the header, the combined value takes the form:
 
 ```text
-Event:    (tamanho_total << 1) | 0
-Response: (tamanho_total << 1) | 1
+Event:    (total_size << 1) | 0
+Response: (total_size << 1) | 1
 ```
 
-O interpretador recupera o tamanho com `base >> 1` e distingue `Event` de `Response` com `base & 1`. Nos cabeçalhos entregues ao callback, `protocol.size` já contém o tamanho decodificado, sem o bit de tipo.
+The interpreter retrieves the size with `base >> 1` and distinguishes `Event` from `Response` with `base & 1`. In the headers delivered to the callback, `protocol.size` already contains the decoded size, without the type bit.
 
-### Mensagens do Obediente
+### Messages from the Obedient
 
-Nas mensagens do Obediente, `size` representa diretamente o tamanho total da mensagem.
+In messages from the Obedient, `size` directly represents the total message size.
 
-| Mensagem | Cabeçalho | Conteúdo |
+| Message | Header | Content |
 | --- | --- | --- |
-| `Notification` | 2 bytes de `size` + 2 bytes de `type` | payload variável |
-| `Intention` | 2 bytes de `size` + 2 bytes de `type` + 2 bytes de `correlationId` | payload variável |
+| `Notification` | 2 bytes of `size` + 2 bytes of `type` | variable payload |
+| `Intention` | 2 bytes of `size` + 2 bytes of `type` + 2 bytes of `correlationId` | variable payload |
 
-O tamanho informado deve incluir o cabeçalho e o payload. Os conversores copiam o cabeçalho e o payload para um `SteamNetworkingMessage_t`; eles não montam o valor semântico do campo `size` automaticamente.
+The specified size must include the header and payload. The converters copy the header and payload into a `SteamNetworkingMessage_t`; they do not automatically construct the semantic value of the `size` field.
 
-## Identificadores
+## Identifiers
 
-- `type_id` identifica o tipo semântico definido pela aplicação e aparece no código como `MBT::type`.
-- `correlationId` relaciona uma resposta com a intenção correspondente.
-- O ID recebido no callback de mensagens interpretadas pelo servidor é o identificador interno atribuído pelo `ConnectionManager`.
+- `type_id` identifies the semantic type defined by the application and appears in the code as `MBT::type`.
+- `correlationId` relates a response to its corresponding intention.
+- The ID received in the server's interpreted message callback is the internal identifier assigned by `ConnectionManager`.
 
-Esse ID interno pertence à implementação de gerenciamento de conexões e não é um campo do protocolo INER. O nome `originId` também não designa um campo do protocolo. Destinos de rede usam handles `HSteamNetConnection`, distintos dos IDs internos e dos identificadores semânticos.
+This internal ID belongs to the connection management implementation and is not an INER protocol field. The name `originId` does not designate a protocol field either. Network destinations use `HSteamNetConnection` handles, which are distinct from internal IDs and semantic identifiers.
 
-## Destinos de rede
+## Network destinations
 
-`lightnerx::network::Target`, exportado pelo módulo `lightnerx.network.target`, define para onde uma mensagem enfileirada será enviada. As fábricas estáticas criam a descrição do destino:
+`lightnerx::network::Target`, exported by the `lightnerx.network.target` module, defines where a queued message will be sent. The static factories create the destination description:
 
-| Fábrica | Destino |
+| Factory | Destination |
 | --- | --- |
-| `Target::single(connection)` | uma conexão específica |
-| `Target::group(connections)` | todas as conexões presentes no vetor informado |
-| `Target::broadcast()` | todas as conexões registradas no `ConnectionManager` |
-| `Target::broadcast(exceptions)` | todas as conexões registradas no `ConnectionManager`, exceto os handles informados |
+| `Target::single(connection)` | a specific connection |
+| `Target::group(connections)` | all connections in the provided vector |
+| `Target::broadcast()` | all connections registered in `ConnectionManager` |
+| `Target::broadcast(exceptions)` | all connections registered in `ConnectionManager`, except the specified handles |
 
-`Target::group` guarda a seleção explícita de handles. O broadcast consulta o `ConnectionManager` passado a `flushAll` no momento do flush, usando as associações mantidas pela aplicação. Suas exceções também são handles `HSteamNetConnection`.
+`Target::group` stores the explicit selection of handles. Broadcast queries the `ConnectionManager` passed to `flushAll` at flush time, using the mappings maintained by the application. Its exceptions are also `HSteamNetConnection` handles.
 
-## Fluxo de recebimento
+## Receiving flow
 
 ```text
-Rede -> callback do Server -> obedientInterpret -> callback da aplicação
-Rede -> callback do Client -> authorityInterpret -> callback da aplicação
+Network -> Server callback -> obedientInterpret -> application callback
+Network -> Client callback -> authorityInterpret -> application callback
 ```
 
-`MessageInterpreter` entrega um `lightnerx::communication::Message` cujo `header` contém o tipo concreto em uma `std::variant` e cujo `payload` é um `std::span<const std::byte>`.
+`MessageInterpreter` delivers a `lightnerx::communication::Message` whose `header` contains the concrete type in a `std::variant` and whose `payload` is a `std::span<const std::byte>`.
 
-Os callbacks são executados durante a chamada de interpretação. O cabeçalho é entregue por valor, mas o span apenas referencia os bytes recebidos. No fluxo com `Server` ou `Client`, esses bytes são liberados depois dos callbacks de recebimento. Para conservar o payload, copie seus bytes durante o callback; copiar apenas `Message` mantém a referência ao mesmo buffer.
+Callbacks run during the interpretation call. The header is delivered by value, but the span only references the received bytes. In the flow with `Server` or `Client`, these bytes are released after the receive callbacks. To retain the payload, copy its bytes during the callback; copying only `Message` keeps a reference to the same buffer.
 
-## Fluxo de envio
+## Sending flow
 
-O fluxo comum é:
+The usual flow is:
 
-1. Inicializar a rede e chamar `initMessagesBatcher(capacity)` antes do primeiro enfileiramento.
-2. Construir o cabeçalho com o tamanho total da mensagem.
-3. Criar um `lightnerx::network::Target`.
-4. Usar o conversor correspondente para obter um `lightnerx::network::OutboundMessage`.
-5. Entregar o objeto a `queueMessage(std::move(outbound))`, transferindo a propriedade da mensagem e do destino.
-6. Verificar o resultado do enfileiramento e chamar `flushAll(connectionManager)` no momento escolhido pela aplicação. A liberação da mensagem passa a ser responsabilidade do batcher, inclusive quando o enfileiramento retorna erro.
+1. Initialize the network and call `initMessagesBatcher(capacity)` before queuing the first message.
+2. Construct the header with the total message size.
+3. Create a `lightnerx::network::Target`.
+4. Use the corresponding converter to obtain a `lightnerx::network::OutboundMessage`.
+5. Pass the object to `queueMessage(std::move(outbound))`, transferring ownership of the message and destination.
+6. Check the queuing result and call `flushAll(connectionManager)` at the time chosen by the application. Releasing the message becomes the batcher's responsibility, including when queuing returns an error.
 
-Exemplo de um `Event` da Autoridade com um byte de payload definido pela aplicação. A função pressupõe a rede e o batcher inicializados e permite broadcast com ou sem exceções:
+Example of an `Event` from the Authority with one byte of payload defined by the application. The function assumes that the network and batcher have been initialized and supports broadcast with or without exceptions:
 
 ```cpp
 #include "steam/steamnetworkingtypes.h"
@@ -205,14 +205,14 @@ std::expected<void, std::error_code> broadcastEvent(
 }
 ```
 
-Chame `broadcastEvent(connections)` para todos ou `broadcastEvent(connections, {connectionToSkip})` para excluir um handle, verificando o `std::expected` retornado.
+Call `broadcastEvent(connections)` for everyone or `broadcastEvent(connections, {connectionToSkip})` to exclude a handle, checking the returned `std::expected`.
 
-### O que cada etapa faz
+### What each step does
 
-`queueMessage` recebe o `OutboundMessage` do conversor e armazena a mesma mensagem com seu destino, sem nova alocação de mensagem nem cópia dos bytes. A chamada consome a mensagem: no sucesso, o batcher a mantém até o flush; se a fila estiver cheia, ele a libera imediatamente. O chamador não deve chamar `Release()` nem reutilizar a mensagem depois de entregá-la à fila. Um ponteiro nulo é rejeitado com `invalid_argument`.
+`queueMessage` receives the `OutboundMessage` from the converter and stores the same message with its destination, without allocating another message or copying the bytes. The call consumes the message: on success, the batcher keeps it until the flush; if the queue is full, it releases it immediately. The caller must not call `Release()` or reuse the message after passing it to the queue. A null pointer is rejected with `invalid_argument`.
 
-`flushAll` percorre as mensagens pendentes, encaminha cada uma conforme seu destino e libera a mensagem recebida do conversor com `Release()`. Todas as entradas são processadas e a fila é esvaziada mesmo quando há erros de envio. O retorno informa sucesso ou o último erro encontrado entre essas operações.
+`flushAll` iterates over pending messages, routes each one according to its destination, and releases the message received from the converter with `Release()`. All entries are processed and the queue is emptied even when send errors occur. The return value indicates success or the last error encountered among these operations.
 
-O batching permite acumular várias mensagens antes de um flush. Cada entrada continua sendo uma mensagem separada; os payloads não são concatenados. A aplicação decide quando fazer o flush, por exemplo ao final de uma atualização. O sucesso indica que o transporte aceitou as operações de envio, sem confirmar o processamento no destinatário.
+Batching lets you accumulate multiple messages before a flush. Each entry remains a separate message; payloads are not concatenated. The application decides when to flush, for example at the end of an update. Success indicates that the transport accepted the send operations, without confirming processing by the recipient.
 
-Para `Event` e `Response`, o campo `size` deve usar o valor combinado descrito acima. Para `Intention` e `Notification`, ele usa o tamanho total diretamente.
+For `Event` and `Response`, the `size` field must use the combined value described above. For `Intention` and `Notification`, it uses the total size directly.

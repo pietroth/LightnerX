@@ -1,46 +1,46 @@
 # LightnerX
 
-LightnerX é uma biblioteca modular estática em C++ para construir aplicações que se comunicam usando o protocolo semântico INER. O projeto CMake fornece a target `LightnerX`; ele não produz nem exige um executável próprio. A biblioteca oferece tipos para representar mensagens, interpretadores, callbacks, gerenciamento de conexões e uma camada de transporte baseada em GameNetworkingSockets.
+LightnerX is a modular static C++ library for building applications that communicate using the INER semantic protocol. The CMake project provides the `LightnerX` target; it neither produces nor requires its own executable. The library provides types for representing messages, interpreters, callbacks, connection management, and a transport layer based on GameNetworkingSockets.
 
-O INER define o significado das mensagens trocadas entre uma Autoridade e um Obediente. Ele não define sockets, conexões ou um modelo de execução. Esses recursos são fornecidos pelos componentes de rede do LightnerX e podem ser conectados à aplicação conforme a necessidade do desenvolvedor.
+INER defines the meaning of messages exchanged between an Authority and an Obedient. It does not define sockets, connections, or an execution model. These capabilities are provided by LightnerX's networking components and can be connected to the application according to the developer's needs.
 
-## Biblioteca, não framework
+## Library, not a framework
 
-O LightnerX fornece componentes reutilizáveis. A aplicação consumidora decide:
+LightnerX provides reusable components. The consuming application decides:
 
-- quando inicializar e encerrar os componentes;
-- como executar `update()`;
-- quais threads utilizar;
-- como organizar o ciclo de vida das conexões;
-- quais módulos usar ou substituir por implementações próprias.
+- when to initialize and shut down components;
+- how to run `update()`;
+- which threads to use;
+- how to organize the connection lifecycle;
+- which modules to use or replace with its own implementations.
 
-É possível, por exemplo, entregar bytes de um transporte próprio a `lightnerx::communication::MessageInterpreter`. Para interpretar mensagens do Obediente, `obedientInterpret` recebe um `lightnerx::network::ConnectionManager`; uma aplicação que gerencie conexões por conta própria deve manter nesse objeto a associação entre handles e IDs utilizada pelo interpretador.
+For example, you can pass bytes from your own transport to `lightnerx::communication::MessageInterpreter`. To interpret messages from the Obedient, `obedientInterpret` takes a `lightnerx::network::ConnectionManager`; an application that manages connections on its own must maintain the mapping between handles and IDs used by the interpreter in that object.
 
-## Conceitos principais
+## Key concepts
 
-- **Autoridade:** controla estados internos e recebe intenções do Obediente.
-- **Obediente:** envia intenções à Autoridade e recebe eventos e respostas.
-- **Event:** acontecimento comunicado pela Autoridade.
-- **Response:** resultado de uma intenção enviada pelo Obediente.
-- **Intention:** solicitação de ação enviada à Autoridade.
-- **Notification:** informação enviada à Autoridade sem solicitação de alteração de estado.
+- **Authority:** controls internal states and receives intentions from the Obedient.
+- **Obedient:** sends intentions to the Authority and receives events and responses.
+- **Event:** an occurrence communicated by the Authority.
+- **Response:** the result of an intention sent by the Obedient.
+- **Intention:** an action request sent to the Authority.
+- **Notification:** information sent to the Authority without requesting a state change.
 
-No LightnerX, a aplicação conecta os componentes por callbacks: a rede entrega bytes e o `MessageInterpreter` interpreta esses bytes segundo a direção da comunicação. No envio, `lightnerx::network::Target` permite selecionar uma conexão, um grupo ou um broadcast com ou sem exceções.
+In LightnerX, the application connects components through callbacks: the network delivers bytes, and `MessageInterpreter` interprets those bytes according to the direction of communication. When sending, `lightnerx::network::Target` lets you select a connection, a group, or a broadcast with or without exceptions.
 
-## Navegação
+## Navigation
 
-- [Configuração](docs/setup.md)
-- [Primeiros passos](docs/first-steps.md)
-- [Comunicação e protocolo INER](docs/communication.md)
-- [Referência da API](docs/api.md)
+- [Setup](docs/setup.md)
+- [First steps](docs/first-steps.md)
+- [Communication and the INER protocol](docs/communication.md)
+- [API reference](docs/api.md)
 
-## Exemplo de servidor
+## Server example
 
-Este exemplo recebe notificações do cliente e envia o texto `Hello, World!` em eventos para as conexões registradas. Os trechos abaixo compõem o programa completo ao final do README; as instruções ficam dentro da função principal, após os imports apresentados no código completo.
+This example receives notifications from the client and sends the text `Hello, World!` in events to registered connections. The snippets below make up the complete program at the end of the README; the statements belong inside the main function, after the imports shown in the complete code.
 
-### Criar os componentes
+### Create the components
 
-O gerenciador associa handles aos IDs internos dos clientes. Registre o ID `47` para que o interpretador reconheça as notificações enviadas pelo cliente deste exemplo.
+The manager maps handles to internal client IDs. Register ID `47` so that the interpreter recognizes notifications sent by the client in this example.
 
 ```cpp
 using namespace std::chrono_literals;
@@ -54,15 +54,15 @@ communication::NotificationRegistry notifications;
 notifications.registerId(47);
 ```
 
-### Acompanhar as conexões
+### Track connections
 
-Os callbacks mantêm o gerenciador atualizado. Se o registro de uma conexão falhar, o servidor solicita sua desconexão.
+The callbacks keep the manager up to date. If registering a connection fails, the server requests its disconnection.
 
 ```cpp
 server.addClientConnectedCallback([&](HSteamNetConnection connection) {
     if (!connections.add(connection)) {
         if (const auto result = server.disconnectConnection(connection, false); !result) {
-            std::println("Falha ao desconectar: {}", result.error().message());
+            std::println("Failed to disconnect: {}", result.error().message());
         }
     }
 });
@@ -74,9 +74,9 @@ server.addClientDisconnectedCallback([&](HSteamNetConnection connection) {
 });
 ```
 
-### Receber mensagens
+### Receive messages
 
-Encaminhe os bytes recebidos a `obedientInterpret`. O callback do interpretador entrega a mensagem e o ID interno do cliente. Neste exemplo, o payload é texto e é lido durante o callback.
+Forward the received bytes to `obedientInterpret`. The interpreter's callback delivers the message and the internal client ID. In this example, the payload is text and is read during the callback.
 
 ```cpp
 server.addClientReceivedMessageCallback(
@@ -90,78 +90,78 @@ interpreter.addObedientInterpretedMessageCallback(
         const std::string_view text{
             reinterpret_cast<const char*>(message.payload.data()), message.payload.size()
         };
-        std::println("Cliente {}: {}", clientId, text);
+        std::println("Client {}: {}", clientId, text);
     }
 );
 ```
 
-### Iniciar o servidor
+### Start the server
 
-Inicie a escuta na porta `41333`, com timeout de conexão estabelecida de `3000` ms, e reserve uma posição para a mensagem pendente do batcher.
+Start listening on port `41333`, with an established connection timeout of `3000` ms, and reserve one slot for the batcher's pending message.
 
 ```cpp
 if (const auto result = server.start(41333, 3000); !result) {
-    std::println("Falha ao iniciar: {}", result.error().message());
+    std::println("Failed to start: {}", result.error().message());
     return 1;
 }
 network::initMessagesBatcher(1);
 ```
 
-### Preparar um evento
+### Prepare an event
 
-Converta o texto em bytes e inclua cabeçalho e payload no tamanho total. Para `Event`, o tamanho é deslocado um bit à esquerda. O tipo `990` é escolhido pela aplicação.
+Convert the text to bytes and include the header and payload in the total size. For `Event`, the size is shifted one bit to the left. Type `990` is chosen by the application.
 
 ```cpp
 const std::string_view greeting = "Hello, World!";
 const auto payload = std::as_bytes(std::span{greeting});
 const communication::Event event{
-    // O bit menos significativo distingue Event de Response.
+    // The least significant bit distinguishes Event from Response.
     static_cast<std::uint16_t>((sizeof(communication::Event) + payload.size()) << 1),
     990
 };
 ```
 
-### Atualizar e enviar
+### Update and send
 
-`update()` processa a rede. O conversor cria um `OutboundMessage`, que é entregue diretamente a `queueMessage`. `Target::broadcast()` seleciona as conexões registradas no momento do flush.
+`update()` processes the network. The converter creates an `OutboundMessage`, which is passed directly to `queueMessage`. `Target::broadcast()` selects the connections registered at flush time.
 
 ```cpp
 while (true) {
     if (const auto result = server.update(); !result) {
-        std::println("Falha ao atualizar: {}", result.error().message());
+        std::println("Failed to update: {}", result.error().message());
         break;
     }
     if (const auto result = network::queueMessage(communication::event2OutboundMessage(
             event, payload, network::Target::broadcast())); !result) {
-        std::println("Falha ao enfileirar: {}", result.error().message());
+        std::println("Failed to queue: {}", result.error().message());
         break;
     }
     if (const auto result = network::flushAll(connections); !result) {
-        std::println("Falha ao enviar: {}", result.error().message());
+        std::println("Failed to send: {}", result.error().message());
         break;
     }
     std::this_thread::sleep_for(3s);
 }
 ```
 
-`queueMessage` assume a propriedade da mensagem, inclusive quando retorna erro; a aplicação não chama `Release()` depois. `flushAll` processa a fila e libera as mensagens. O intervalo de três segundos é uma escolha deste exemplo; a aplicação define seu próprio ritmo de atualização.
+`queueMessage` takes ownership of the message, including when it returns an error; the application does not call `Release()` afterward. `flushAll` processes the queue and releases the messages. The three-second interval is a choice made for this example; the application defines its own update rate.
 
-### Encerrar o servidor
+### Shut down the server
 
-Após sair do loop por erro, feche o servidor. O retorno `1` sinaliza a saída por falha neste exemplo.
+After exiting the loop due to an error, close the server. Returning `1` signals an exit due to failure in this example.
 
 ```cpp
 server.close();
 return 1;
 ```
 
-## Exemplo de cliente
+## Client example
 
-O cliente conecta ao servidor em `127.0.0.1:41333`, imprime os eventos recebidos e envia uma notificação com o mesmo texto. Execute servidor e cliente em processos separados.
+The client connects to the server at `127.0.0.1:41333`, prints the received events, and sends a notification with the same text. Run the server and client in separate processes.
 
-### Criar os componentes
+### Create the components
 
-O gerenciador vazio atende à assinatura de `flushAll`. O envio individual ao servidor usa diretamente o handle de conexão do cliente.
+The empty manager satisfies the `flushAll` signature. Sending to the server individually uses the client's connection handle directly.
 
 ```cpp
 using namespace std::chrono_literals;
@@ -169,13 +169,13 @@ namespace network = lightnerx::network;
 namespace communication = lightnerx::communication;
 
 network::Client client;
-network::ConnectionManager connections{0, 0}; // Exigido pelo flush, sem broadcast.
+network::ConnectionManager connections{0, 0}; // Required by flush, without broadcast.
 communication::MessageInterpreter interpreter;
 ```
 
-### Receber mensagens do servidor
+### Receive messages from the server
 
-Encaminhe os bytes a `authorityInterpret`, que interpreta mensagens da Autoridade. O callback abaixo imprime o payload textual combinado por estes exemplos e trata payloads vazios.
+Forward the bytes to `authorityInterpret`, which interprets messages from the Authority. The callback below prints the text payload agreed upon by these examples and handles empty payloads.
 
 ```cpp
 client.addServerReceivedMessageCallback([&](std::span<const std::byte> bytes) {
@@ -186,59 +186,59 @@ interpreter.addAuthorityInterpretedMessageCallback([](communication::Message mes
     const auto text = message.payload.empty() ? std::string_view{} : std::string_view{
         reinterpret_cast<const char*>(message.payload.data()), message.payload.size()
     };
-    std::println("Servidor: {}", text);
+    std::println("Server: {}", text);
 });
 ```
 
-Os callbacks usam os bytes durante a chamada. Para conservar um payload recebido, copie seus bytes para armazenamento da aplicação antes de retornar.
+The callbacks use the bytes during the call. To retain a received payload, copy its bytes into application storage before returning.
 
-### Iniciar e conectar
+### Start and connect
 
-Inicialize o cliente, solicite a conexão com o servidor e reserve espaço no batcher. A conexão será acompanhada nas chamadas de `update()`.
+Initialize the client, request a connection to the server, and reserve space in the batcher. The connection will be tracked during calls to `update()`.
 
 ```cpp
 if (const auto result = client.start(); !result) {
-    std::println("Falha ao iniciar: {}", result.error().message());
+    std::println("Failed to start: {}", result.error().message());
     return 1;
 }
 if (const auto result = client.connect("127.0.0.1", 41333); !result) {
-    std::println("Falha ao conectar: {}", result.error().message());
+    std::println("Failed to connect: {}", result.error().message());
     return 1;
 }
 network::initMessagesBatcher(1);
 ```
 
-### Preparar uma notificação
+### Prepare a notification
 
-`Notification` usa o tamanho total diretamente, sem deslocamento de bits. O ID `47` corresponde ao registro feito no servidor.
+`Notification` uses the total size directly, without bit shifting. ID `47` corresponds to the registration made on the server.
 
 ```cpp
 const std::string_view greeting = "Hello, World!";
 const auto payload = std::as_bytes(std::span{greeting});
 const communication::Notification notification{
     static_cast<std::uint16_t>(sizeof(communication::Notification) + payload.size()),
-    47 // O servidor deve registrar este ID no NotificationRegistry.
+    47 // The server must register this ID in NotificationRegistry.
 };
 ```
 
-### Atualizar e enviar ao servidor
+### Update and send to the server
 
-Processe até 32 mensagens por atualização e envie quando `isConnected()` indicar a conexão estabelecida. `Target::single` seleciona o handle do servidor.
+Process up to 32 messages per update and send when `isConnected()` indicates an established connection. `Target::single` selects the server's handle.
 
 ```cpp
 while (true) {
     if (const auto result = client.update(32); !result) {
-        std::println("Falha ao atualizar: {}", result.error().message());
+        std::println("Failed to update: {}", result.error().message());
         break;
     }
     if (client.isConnected()) {
         if (const auto result = network::queueMessage(communication::notification2OutboundMessage(
                 notification, payload, network::Target::single(client.getServerHConn()))); !result) {
-            std::println("Falha ao enfileirar: {}", result.error().message());
+            std::println("Failed to queue: {}", result.error().message());
             break;
         }
         if (const auto result = network::flushAll(connections); !result) {
-            std::println("Falha ao enviar: {}", result.error().message());
+            std::println("Failed to send: {}", result.error().message());
             break;
         }
     }
@@ -246,19 +246,19 @@ while (true) {
 }
 ```
 
-### Encerrar o cliente
+### Shut down the client
 
-Ao sair por erro, o destrutor de `Client` fecha a conexão e encerra a rede. O retorno `1` indica a falha que interrompeu o exemplo.
+When exiting due to an error, the `Client` destructor closes the connection and shuts down the network. Returning `1` indicates the failure that interrupted the example.
 
 ```cpp
-return 1; // O destrutor do Client encerra a conexão e a rede.
+return 1; // The Client destructor closes the connection and shuts down the network.
 ```
 
-## Códigos completos
+## Complete code
 
-Os programas abaixo reúnem os trechos apresentados. O payload textual, os IDs, o loop e os intervalos são escolhas da aplicação consumidora.
+The programs below bring together the snippets presented above. The text payload, IDs, loop, and intervals are choices made by the consuming application.
 
-### Servidor completo
+### Complete server
 
 ```cpp
 #include <steam/steamnetworkingtypes.h>
@@ -287,7 +287,7 @@ int main() {
     server.addClientConnectedCallback([&](HSteamNetConnection connection) {
         if (!connections.add(connection)) {
             if (const auto result = server.disconnectConnection(connection, false); !result) {
-                std::println("Falha ao desconectar: {}", result.error().message());
+                std::println("Failed to disconnect: {}", result.error().message());
             }
         }
     });
@@ -309,12 +309,12 @@ int main() {
             const std::string_view text{
                 reinterpret_cast<const char*>(message.payload.data()), message.payload.size()
             };
-            std::println("Cliente {}: {}", clientId, text);
+            std::println("Client {}: {}", clientId, text);
         }
     );
 
     if (const auto result = server.start(41333, 3000); !result) {
-        std::println("Falha ao iniciar: {}", result.error().message());
+        std::println("Failed to start: {}", result.error().message());
         return 1;
     }
     network::initMessagesBatcher(1);
@@ -322,23 +322,23 @@ int main() {
     const std::string_view greeting = "Hello, World!";
     const auto payload = std::as_bytes(std::span{greeting});
     const communication::Event event{
-        // O bit menos significativo distingue Event de Response.
+        // The least significant bit distinguishes Event from Response.
         static_cast<std::uint16_t>((sizeof(communication::Event) + payload.size()) << 1),
         990
     };
 
     while (true) {
         if (const auto result = server.update(); !result) {
-            std::println("Falha ao atualizar: {}", result.error().message());
+            std::println("Failed to update: {}", result.error().message());
             break;
         }
         if (const auto result = network::queueMessage(communication::event2OutboundMessage(
                 event, payload, network::Target::broadcast())); !result) {
-            std::println("Falha ao enfileirar: {}", result.error().message());
+            std::println("Failed to queue: {}", result.error().message());
             break;
         }
         if (const auto result = network::flushAll(connections); !result) {
-            std::println("Falha ao enviar: {}", result.error().message());
+            std::println("Failed to send: {}", result.error().message());
             break;
         }
         std::this_thread::sleep_for(3s);
@@ -349,7 +349,7 @@ int main() {
 }
 ```
 
-### Cliente completo
+### Complete client
 
 ```cpp
 #include <steam/steamnetworkingtypes.h>
@@ -369,7 +369,7 @@ int main() {
     namespace communication = lightnerx::communication;
 
     network::Client client;
-    network::ConnectionManager connections{0, 0}; // Exigido pelo flush, sem broadcast.
+    network::ConnectionManager connections{0, 0}; // Required by flush, without broadcast.
     communication::MessageInterpreter interpreter;
 
     client.addServerReceivedMessageCallback([&](std::span<const std::byte> bytes) {
@@ -380,15 +380,15 @@ int main() {
         const auto text = message.payload.empty() ? std::string_view{} : std::string_view{
             reinterpret_cast<const char*>(message.payload.data()), message.payload.size()
         };
-        std::println("Servidor: {}", text);
+        std::println("Server: {}", text);
     });
 
     if (const auto result = client.start(); !result) {
-        std::println("Falha ao iniciar: {}", result.error().message());
+        std::println("Failed to start: {}", result.error().message());
         return 1;
     }
     if (const auto result = client.connect("127.0.0.1", 41333); !result) {
-        std::println("Falha ao conectar: {}", result.error().message());
+        std::println("Failed to connect: {}", result.error().message());
         return 1;
     }
     network::initMessagesBatcher(1);
@@ -397,28 +397,28 @@ int main() {
     const auto payload = std::as_bytes(std::span{greeting});
     const communication::Notification notification{
         static_cast<std::uint16_t>(sizeof(communication::Notification) + payload.size()),
-        47 // O servidor deve registrar este ID no NotificationRegistry.
+        47 // The server must register this ID in NotificationRegistry.
     };
 
     while (true) {
         if (const auto result = client.update(32); !result) {
-            std::println("Falha ao atualizar: {}", result.error().message());
+            std::println("Failed to update: {}", result.error().message());
             break;
         }
         if (client.isConnected()) {
             if (const auto result = network::queueMessage(communication::notification2OutboundMessage(
                     notification, payload, network::Target::single(client.getServerHConn()))); !result) {
-                std::println("Falha ao enfileirar: {}", result.error().message());
+                std::println("Failed to queue: {}", result.error().message());
                 break;
             }
             if (const auto result = network::flushAll(connections); !result) {
-                std::println("Falha ao enviar: {}", result.error().message());
+                std::println("Failed to send: {}", result.error().message());
                 break;
             }
         }
         std::this_thread::sleep_for(3000ms);
     }
 
-    return 1; // O destrutor do Client encerra a conexão e a rede.
+    return 1; // The Client destructor closes the connection and shuts down the network.
 }
 ```
