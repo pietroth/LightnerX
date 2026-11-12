@@ -164,9 +164,9 @@ int main() {
 
 The `server.update()` and `client.update()` methods are called by the application. They can run on the main thread, on a dedicated thread, or within the consuming project's existing execution loop.
 
-The library does not require a specific number of threads or a fixed interval between updates.
+The library does not require a specific number of threads or a fixed interval between updates. Run these server and client examples in separate processes: exactly one started wrapper owns networking in each process. Wrappers cannot be copied or moved.
 
-Receive callbacks run during `update()`, and interpretation callbacks run on the thread that calls the interpreter. When sharing components across threads, handle synchronization in the application. For the batcher, serialize initialization, queuing, and flush calls, which operate on the same queue.
+Receive callbacks run during `update()`, and interpretation callbacks run on the thread that calls the interpreter. When sharing components across threads, handle synchronization in the application. For the batcher, serialize initialization, queuing, clearing and flush calls, which operate on the same queue. Callback exceptions propagate after resource cleanup; catch them around `update()` if the application intends to continue. See [callback behavior](api.md#validation-and-callback-behavior) for supported reentrant operations.
 
 ## Batch sending
 

@@ -20,17 +20,36 @@ export namespace lightnerx::network {
         ISteamNetworkingSockets* m_pInterface = nullptr;
         HSteamListenSocket m_hListenSocket = k_invalidSocket;
         HSteamNetPollGroup m_hPollGroup = k_invalidPollGroup;
+        bool updating = false;
+        bool closeRequested = false;
+        unsigned activeCalls = 0;
+        std::exception_ptr callbackException;
+
+        struct ActiveCall {
+            Server& server;
+            explicit ActiveCall(Server& value) : server(value) { ++server.activeCalls; }
+            ~ActiveCall() {
+                if (--server.activeCalls == 0 && server.closeRequested) server.close();
+            }
+        };
 
         using ClientConnectedCallback = std::function<void(HSteamNetConnection)>;
-        std::vector<ClientConnectedCallback> clientConnectedCallbacks;
+        std::deque<ClientConnectedCallback> clientConnectedCallbacks;
 
         using ClientDisconnectedCallback = std::function<void(HSteamNetConnection)>;
-        std::vector<ClientDisconnectedCallback> clientDisconnectedCallbacks;
+        std::deque<ClientDisconnectedCallback> clientDisconnectedCallbacks;
 
         using ClientReceivedMessageCallback = std::function<void(std::span<const std::byte>, HSteamNetConnection)>;
-        std::vector<ClientReceivedMessageCallback> clientReceivedMessageCallbacks;
+        std::deque<ClientReceivedMessageCallback> clientReceivedMessageCallbacks;
 
     public:
+        Server() = default;
+        Server(const Server&) = delete;
+        Server& operator=(const Server&) = delete;
+        Server(Server&&) = delete;
+        Server& operator=(Server&&) = delete;
+        ~Server() { close(); }
+
         void addClientConnectedCallback(ClientConnectedCallback callback) {
             clientConnectedCallbacks.push_back(callback);
         }
@@ -44,13 +63,17 @@ export namespace lightnerx::network {
         }
 
         std::expected<void, std::error_code> start(int port, uint32_t timeoutConnected) {
-            if (!lightnerx::network::networkInit()) {
-                return std::unexpected(
-                    std::make_error_code(std::errc::io_error)
-                );
+            if (m_pInterface) {
+                return std::unexpected(std::make_error_code(std::errc::operation_in_progress));
             }
+            if (port < 1 || port > 65535 || timeoutConnected > INT32_MAX) {
+                return std::unexpected(std::make_error_code(std::errc::invalid_argument));
+            }
+            if (auto acquired = detail::acquireNetworkOwner(this); !acquired) return acquired;
 
             m_pInterface = SteamNetworkingSockets();
+            closeRequested = false;
+            callbackException = nullptr;
 
             SteamNetworkingIPAddr address;
             address.Clear();
@@ -77,21 +100,14 @@ export namespace lightnerx::network {
             );
 
             if (m_hListenSocket == k_invalidSocket) {
-                s_pCallbackInstance = nullptr;
-                GameNetworkingSockets_Kill();
-
-                std::println(std::cerr, "Failed to create listen socket.");
+                close();
                 return std::unexpected(std::make_error_code(std::errc::resource_unavailable_try_again));
             }
 
             m_hPollGroup = m_pInterface->CreatePollGroup();
 
             if (m_hPollGroup == k_invalidPollGroup) {
-                s_pCallbackInstance = nullptr;
-                m_pInterface->CloseListenSocket(m_hListenSocket);
-                GameNetworkingSockets_Kill();
-
-                std::println(std::cerr, "Failed to create poll group.");
+                close();
                 return std::unexpected(std::make_error_code(std::errc::resource_unavailable_try_again));
             }
 
@@ -99,7 +115,23 @@ export namespace lightnerx::network {
         }
 
         std::expected<void, std::error_code> update() {
+            if (!m_pInterface) {
+                return std::unexpected(std::make_error_code(std::errc::not_connected));
+            }
+            if (updating || activeCalls != 0) {
+                return std::unexpected(std::make_error_code(std::errc::operation_in_progress));
+            }
+            ActiveCall active{*this};
+            updating = true;
+            struct UpdateGuard {
+                bool& flag;
+                ~UpdateGuard() { flag = false; }
+            } updateGuard{updating};
             m_pInterface->RunCallbacks();
+            if (callbackException) {
+                std::rethrow_exception(std::exchange(callbackException, nullptr));
+            }
+            if (closeRequested) return {};
 
             ISteamNetworkingMessage* message = nullptr;
 
@@ -109,16 +141,22 @@ export namespace lightnerx::network {
                 1
             );
 
+            const auto release = [](ISteamNetworkingMessage* value) { if (value) value->Release(); };
+            std::unique_ptr<ISteamNetworkingMessage, decltype(release)> ownedMessage(message, release);
+            if (received < 0) {
+                return std::unexpected(std::make_error_code(std::errc::io_error));
+            }
+
             if (received > 0) {
-                for (const auto& callback : clientReceivedMessageCallbacks) {
-                    callback({
+                const auto count = clientReceivedMessageCallbacks.size();
+                for (std::size_t i = 0; i < count && !closeRequested; ++i) {
+                    clientReceivedMessageCallbacks[i]({
                         static_cast<const std::byte*>(message->m_pData),
                         static_cast<std::size_t>(message->m_cbSize)
                         },
                         message->m_conn
                     );
                 }
-                message->Release();
             }
 
             return {};
@@ -127,13 +165,14 @@ export namespace lightnerx::network {
         std::expected<void, std::error_code> disconnectConnection(
             HSteamNetConnection hConn, bool enableLinger
         ) {
-            if (!lightnerx::network::isNetworkInitialized()) {
+            if (!m_pInterface || closeRequested) {
                 return std::unexpected(
                     std::make_error_code(std::errc::not_connected)
                 );
             }
 
-            ISteamNetworkingSockets* sockets = SteamNetworkingSockets();
+            ActiveCall active{*this};
+            ISteamNetworkingSockets* sockets = m_pInterface;
 
             if (!sockets->CloseConnection(
                 hConn,
@@ -143,17 +182,22 @@ export namespace lightnerx::network {
             )) {
                 return std::unexpected(
                     std::make_error_code(std::errc::io_error)
-                );;
+                );
             }
 
-            for (const auto& callback : clientDisconnectedCallbacks) {
-                callback(hConn);
+            const auto count = clientDisconnectedCallbacks.size();
+            for (std::size_t i = 0; i < count && !closeRequested; ++i) {
+                clientDisconnectedCallbacks[i](hConn);
             }
 
             return {};
         }
 
-        void close() {
+        void close() noexcept {
+            if (activeCalls != 0) {
+                closeRequested = true;
+                return;
+            }
             if (m_pInterface == nullptr) {
                 return;
             }
@@ -169,9 +213,11 @@ export namespace lightnerx::network {
             }
 
             m_pInterface = nullptr;
-            s_pCallbackInstance = nullptr;
+            if (s_pCallbackInstance == this) s_pCallbackInstance = nullptr;
+            closeRequested = false;
+            callbackException = nullptr;
 
-            GameNetworkingSockets_Kill();
+            detail::releaseNetworkOwner(this);
         }
 
         private:
@@ -179,13 +225,20 @@ export namespace lightnerx::network {
 
             static void SteamNetConnectionStatusChangedCallback(
                 SteamNetConnectionStatusChangedCallback_t* pInfo
-            ) {
-                if (s_pCallbackInstance != nullptr) {
-                    s_pCallbackInstance->OnConnectionStatusChanged(pInfo);
+            ) noexcept {
+                auto* instance = s_pCallbackInstance;
+                if (instance != nullptr && !instance->closeRequested) {
+                    try {
+                        instance->OnConnectionStatusChanged(pInfo);
+                    } catch (...) {
+                        // Never unwind through GNS. update() rethrows after RunCallbacks.
+                        if (!instance->callbackException) instance->callbackException = std::current_exception();
+                    }
                 }
             }
 
             void OnConnectionStatusChanged(SteamNetConnectionStatusChangedCallback_t* pInfo) {
+                if (!pInfo || pInfo->m_info.m_hListenSocket != m_hListenSocket) return;
                 HSteamNetConnection hConn = pInfo->m_hConn;
                 SteamNetConnectionInfo_t info = pInfo->m_info;
 
@@ -193,7 +246,7 @@ export namespace lightnerx::network {
                     case k_ESteamNetworkingConnectionState_None:
                             break;
 
-                    case k_ESteamNetworkingConnectionState_Connecting:
+                    case k_ESteamNetworkingConnectionState_Connecting: {
                         if (m_pInterface->AcceptConnection(hConn) != k_EResultOK) {
                             m_pInterface->CloseConnection(hConn, 0, nullptr, false);
                             break;
@@ -204,11 +257,13 @@ export namespace lightnerx::network {
                             break;
                         }
 
-                        for (const auto& clientConnectedCallback : clientConnectedCallbacks) {
-                            clientConnectedCallback(hConn);
+                        const auto count = clientConnectedCallbacks.size();
+                        for (std::size_t i = 0; i < count && !closeRequested; ++i) {
+                            clientConnectedCallbacks[i](hConn);
                         }
 
                         break;
+                    }
 
                     case k_ESteamNetworkingConnectionState_FindingRoute:
                     case k_ESteamNetworkingConnectionState_FinWait:
@@ -221,10 +276,11 @@ export namespace lightnerx::network {
                     case k_ESteamNetworkingConnectionState_ClosedByPeer:
                     case k_ESteamNetworkingConnectionState_ProblemDetectedLocally : {
                         const HSteamNetConnection hConn = pInfo->m_hConn;
-                        m_pInterface->CloseConnection(hConn, 0, nullptr, false);
+                        if (!m_pInterface->CloseConnection(hConn, 0, nullptr, false)) break;
 
-                        for (const auto& callback : clientDisconnectedCallbacks) {
-                            callback(hConn);
+                        const auto count = clientDisconnectedCallbacks.size();
+                        for (std::size_t i = 0; i < count && !closeRequested; ++i) {
+                            clientDisconnectedCallbacks[i](hConn);
                         }
 
                         break;

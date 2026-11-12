@@ -9,11 +9,9 @@ export module lightnerx.network.transport;
 import std;
 
 import lightnerx.network.connection_manager;
-import lightnerx.network.network_manager;
+export import lightnerx.network.network_manager;
 
 export namespace lightnerx::network {
-    constexpr HSteamNetConnection k_invalidConnection = 0;
-
     std::expected<void, std::error_code> sendToConnection(
         const std::span<const std::byte> message,
         const HSteamNetConnection hConn

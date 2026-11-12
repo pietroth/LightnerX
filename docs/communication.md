@@ -98,7 +98,9 @@ Header structures are packed without additional padding using `#pragma pack(push
 
 The first field uses a combined value: the least significant bit indicates whether the message is a `Response`, and the remaining fifteen bits represent the size.
 
-| Message | Header | Content |
+The table describes the recommended formats for emission: approved, denied and failure responses have no payload; partial approval may carry application-defined bytes.
+
+| Message | Header | Recommended content when sending |
 | --- | --- | --- |
 | `Event` | 2 bytes of combined `size` + 2 bytes of `type` | variable payload |
 | `Response` | 2 bytes of combined `size` + 2 bytes of `correlationId` + 1 byte of `status` | no payload for the statuses represented by `Response` |
@@ -113,6 +115,8 @@ Response: (total_size << 1) | 1
 
 The interpreter retrieves the size with `base >> 1` and distinguishes `Event` from `Response` with `base & 1`. In the headers delivered to the callback, `protocol.size` already contains the decoded size, without the type bit.
 
+Reception currently tolerates additional bytes in responses when the declared total matches the supplied span and the selected header is complete. For approved and failure responses, the interpreter ignores those bytes and delivers an empty payload. For denied and partially approved responses, it delivers all bytes after `UnsuccessfulResponse`, even though the recommended denied-response format has no payload. `protocol.size` still includes the complete received message, including any ignored bytes; it can therefore exceed the header size plus the delivered payload size. This reception behavior does not change the recommended emission formats. Converters copy the supplied payload without enforcing status-specific payload rules.
+
 ### Messages from the Obedient
 
 In messages from the Obedient, `size` directly represents the total message size.
@@ -122,7 +126,7 @@ In messages from the Obedient, `size` directly represents the total message size
 | `Notification` | 2 bytes of `size` + 2 bytes of `type` | variable payload |
 | `Intention` | 2 bytes of `size` + 2 bytes of `type` + 2 bytes of `correlationId` | variable payload |
 
-The specified size must include the header and payload. The converters copy the header and payload into a `SteamNetworkingMessage_t`; they do not automatically construct the semantic value of the `size` field.
+The specified size must include the header and payload. Each interpretation call must receive exactly one complete message: the decoded total must equal the supplied span and the header must be complete, otherwise no callback is delivered. Authority messages are limited to 32767 bytes and Obedient messages to 65535 bytes. The interpreter does not split concatenated messages or buffer partial frames. Unknown response statuses are ignored. The converters copy the header and payload into a `SteamNetworkingMessage_t`; they do not automatically construct the semantic value of the `size` field. They throw `std::bad_alloc` if GNS allocation fails and `std::length_error` if the allocation size cannot be represented.
 
 ## Identifiers
 
@@ -216,3 +220,5 @@ Call `broadcastEvent(connections)` for everyone or `broadcastEvent(connections, 
 Batching lets you accumulate multiple messages before a flush. Each entry remains a separate message; payloads are not concatenated. The application decides when to flush, for example at the end of an update. Success indicates that the transport accepted the send operations, without confirming processing by the recipient.
 
 For `Event` and `Response`, the `size` field must use the combined value described above. For `Intention` and `Notification`, it uses the total size directly.
+
+Pending batches can be discarded explicitly with `clearMessagesBatcher()` and are also released at actual network shutdown. A thrown send exception releases the complete queue before propagating to the caller.

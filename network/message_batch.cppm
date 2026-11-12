@@ -8,6 +8,7 @@ export module lightnerx.network.message_batch;
 import std;
 
 import lightnerx.network.transport;
+import lightnerx.network.network_manager;
 import lightnerx.network.target;
 import lightnerx.network.connection_manager;
 
@@ -17,34 +18,60 @@ namespace lightnerx::network {
         Target target;
     };
 
-    std::vector<OutboundMessage> messages;
+    struct MessageQueue {
+        std::vector<OutboundMessage> messages;
+
+        void clear() noexcept {
+            for (const auto& message : messages) {
+                if (message.message) message.message->Release();
+            }
+            messages.clear();
+        }
+
+        ~MessageQueue() {
+            detail::setNetworkCleanup(nullptr);
+            clear();
+        }
+    };
+
+    MessageQueue pending;
+
+    export void clearMessagesBatcher() noexcept {
+        pending.clear();
+    }
 
     export void initMessagesBatcher(int capacity) {
-        messages.reserve(capacity);
+        if (capacity < 0) throw std::invalid_argument("Negative batch capacity");
+        detail::setNetworkCleanup(&clearMessagesBatcher);
+        pending.messages.reserve(static_cast<std::size_t>(capacity));
     }
 
     export std::expected<void, std::error_code> queueMessage(
         OutboundMessage message
     ) {
+        detail::setNetworkCleanup(&clearMessagesBatcher);
         if (message.message == nullptr) {
             return std::unexpected(std::make_error_code(std::errc::invalid_argument));
         }
 
-        if (messages.size() >= messages.capacity()) {
+        if (pending.messages.size() >= pending.messages.capacity()) {
             message.message->Release();
             return std::unexpected(std::make_error_code(std::errc::not_enough_memory));
         }
 
-        messages.push_back(std::move(message));
+        pending.messages.push_back(std::move(message));
         return {};
     }
 
     export std::expected<void, std::error_code> flushAll(
         const ConnectionManager& connectionManager
     ) {
+        struct ReleasePending {
+            ~ReleasePending() { clearMessagesBatcher(); }
+        } releasePending;
         std::error_code lastError;
 
-        for (const auto& message : messages) {
+        for (auto& message : pending.messages) {
             std::span<const std::byte> data{
                 static_cast<const std::byte*>(message.message->m_pData),
                 static_cast<size_t>(message.message->m_cbSize)
@@ -57,7 +84,7 @@ namespace lightnerx::network {
                     data,
                     std::get<HSteamNetConnection>(message.target.connection)
                 );
-            } else if (std::holds_alternative<std::vector<HSteamNetConnection>>(message.target.connection)) {
+            } else if (message.target.isGroup()) {
                 result = lightnerx::network::sendToConnections(
                     data,
                     std::get<std::vector<HSteamNetConnection>>(message.target.connection)
@@ -73,13 +100,9 @@ namespace lightnerx::network {
             if (!result) {
                 lastError = result.error();
             }
-
-            if (message.message != nullptr) {
-                message.message->Release();
-            }
+            message.message->Release();
+            message.message = nullptr;
         }
-
-        messages.clear();
 
         if (lastError) {
             return std::unexpected(lastError);

@@ -9,17 +9,16 @@ export module lightnerx.network.client;
 
 import std;
 
-import lightnerx.network.network_manager;
+export import lightnerx.network.network_manager;
 
 export namespace lightnerx::network {
-    constexpr HSteamNetConnection k_invalidConnection = 0;
-
     class Client {
     private:
         bool connected = false;
+        bool updating = false;
 
         using ServerReceivedMessageCallback = std::function<void(std::span<const std::byte>)>;
-        std::vector<ServerReceivedMessageCallback> serverReceivedMessageCallbacks;
+        std::deque<ServerReceivedMessageCallback> serverReceivedMessageCallbacks;
 
         ISteamNetworkingSockets* m_sockets = nullptr;
         HSteamNetConnection m_connection = k_invalidConnection;
@@ -27,6 +26,12 @@ export namespace lightnerx::network {
         inline static Client* s_callbackInstance = nullptr;
 
     public:
+        Client() = default;
+        Client(const Client&) = delete;
+        Client& operator=(const Client&) = delete;
+        Client(Client&&) = delete;
+        Client& operator=(Client&&) = delete;
+
         ~Client() {
             if (s_callbackInstance == this) {
                 s_callbackInstance = nullptr;
@@ -44,8 +49,8 @@ export namespace lightnerx::network {
                     m_connection = k_invalidConnection;
                 }
 
-                GameNetworkingSockets_Kill();
                 m_sockets = nullptr;
+                detail::releaseNetworkOwner(this);
             }
 
             connected = false;
@@ -62,22 +67,12 @@ export namespace lightnerx::network {
                 );
             }
 
-            if (s_callbackInstance && s_callbackInstance != this) {
-                return std::unexpected(
-                    std::make_error_code(std::errc::device_or_resource_busy)
-                );
-            }
-
-            if (!lightnerx::network::networkInit()) {
-                return std::unexpected(
-                    std::make_error_code(std::errc::io_error)
-                );
-            }
+            if (auto acquired = detail::acquireNetworkOwner(this); !acquired) return acquired;
 
             m_sockets = SteamNetworkingSockets();
 
             if (!m_sockets) {
-                GameNetworkingSockets_Kill();
+                detail::releaseNetworkOwner(this);
 
                 return std::unexpected(
                     std::make_error_code(std::errc::io_error)
@@ -141,6 +136,15 @@ export namespace lightnerx::network {
                 return std::unexpected(std::make_error_code(std::errc::not_connected));
             }
 
+            if (updating) {
+                return std::unexpected(std::make_error_code(std::errc::operation_in_progress));
+            }
+            updating = true;
+            struct UpdateGuard {
+                bool& flag;
+                ~UpdateGuard() { flag = false; }
+            } updateGuard{updating};
+
             m_sockets->RunCallbacks();
 
             if (maxMessagesToProcess <= 0) {
@@ -155,7 +159,12 @@ export namespace lightnerx::network {
             std::vector<SteamNetworkingMessage_t*> messages(
                 static_cast<std::size_t>(maxMessagesToProcess)
             );
-
+            struct ReleaseMessages {
+                std::vector<SteamNetworkingMessage_t*>& messages;
+                ~ReleaseMessages() {
+                    for (auto* message : messages) if (message) message->Release();
+                }
+            } releaseMessages{messages};
 
             const int count = m_sockets->ReceiveMessagesOnConnection(
                 m_connection,
@@ -163,11 +172,18 @@ export namespace lightnerx::network {
                 maxMessagesToProcess
             );
 
+            if (count < 0) {
+                const auto connection = std::exchange(m_connection, k_invalidConnection);
+                connected = false;
+                m_sockets->CloseConnection(connection, 0, nullptr, false);
+                return std::unexpected(std::make_error_code(std::errc::io_error));
+            }
             if (count == 0) {
                 return {};
             }
 
-            for (int i = 0; i < count; ++i) {
+            const auto receivingConnection = m_connection;
+            for (int i = 0; i < count && m_connection == receivingConnection; ++i) {
                 SteamNetworkingMessage_t* message = messages[i];
 
                 std::span<const std::byte> convertedMessage{
@@ -175,18 +191,19 @@ export namespace lightnerx::network {
                     static_cast<std::size_t>(message->m_cbSize)
                 };
 
-                for (const auto& callback : serverReceivedMessageCallbacks) {
-                    callback(convertedMessage);
+                const auto callbackCount = serverReceivedMessageCallbacks.size();
+                for (std::size_t j = 0; j < callbackCount && m_connection == receivingConnection; ++j) {
+                    serverReceivedMessageCallbacks[j](convertedMessage);
                 }
-
                 message->Release();
+                messages[i] = nullptr;
             }
 
             return {};
         }
 
         std::expected<void, std::error_code> disconnect(bool enableLinger) {
-            if (!lightnerx::network::isNetworkInitialized()) {
+            if (!m_sockets || m_connection == k_invalidConnection) {
                 return std::unexpected(
                     std::make_error_code(std::errc::not_connected)
                 );
@@ -199,6 +216,8 @@ export namespace lightnerx::network {
                 nullptr,
                 enableLinger
             )) {
+                m_connection = k_invalidConnection;
+                connected = false;
                 return {};
             }
 

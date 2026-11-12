@@ -32,6 +32,10 @@ export namespace lightnerx::network {
             return std::holds_alternative<std::monostate>(connection);
         }
 
+        [[nodiscard]] bool isGroup() const noexcept {
+            return std::holds_alternative<std::vector<HSteamNetConnection>>(connection);
+        }
+
         [[nodiscard]] bool isSingle() const noexcept {
             return std::holds_alternative<HSteamNetConnection>(connection);
         }

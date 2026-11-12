@@ -15,6 +15,19 @@ import lightnerx.communication.intention;
 import lightnerx.communication.response;
 import lightnerx.communication.event;
 
+namespace lightnerx::communication::detail {
+    SteamNetworkingMessage_t* allocateMessage(std::size_t headerSize, std::size_t payloadSize) {
+        if (payloadSize > static_cast<std::size_t>(std::numeric_limits<int>::max()) - headerSize) {
+            throw std::length_error("Message exceeds the transport allocation limit");
+        }
+        auto* message = SteamNetworkingUtils()->AllocateMessage(static_cast<int>(headerSize + payloadSize));
+        if (!message) {
+            throw std::bad_alloc{};
+        }
+        return message;
+    }
+}
+
 export namespace lightnerx::communication {
     struct Message {
         std::variant<
@@ -30,10 +43,10 @@ export namespace lightnerx::communication {
     class MessageInterpreter {
     private:
         using AuthorityInterpretedMessageCallback = std::function<void(Message)>;
-        std::vector<AuthorityInterpretedMessageCallback> authorityInterpretedMessageCallbacks;
+        std::deque<AuthorityInterpretedMessageCallback> authorityInterpretedMessageCallbacks;
 
         using ObedientInterpretedMessageCallback = std::function<void(Message, uint16_t)>;
-        std::vector<ObedientInterpretedMessageCallback> obedientInterpretedMessageCallbacks;
+        std::deque<ObedientInterpretedMessageCallback> obedientInterpretedMessageCallbacks;
 
     public:
         void addAuthorityInterpretedMessageCallback(AuthorityInterpretedMessageCallback callback) {
@@ -56,6 +69,9 @@ export namespace lightnerx::communication {
 
             uint16_t size;
             std::memcpy(&size, data.data(), sizeof(size));
+            if (size != data.size_bytes()) {
+                return;
+            }
 
             uint16_t type;
             std::memcpy(&type, data.data() + 2, sizeof(type));
@@ -102,6 +118,9 @@ export namespace lightnerx::communication {
 
             int messageTypeFlag = base & 1;
             uint16_t size = base >> 1;
+            if (size != data.size_bytes()) {
+                return;
+            }
 
             if (!messageTypeFlag) {
                 // event
@@ -160,14 +179,16 @@ export namespace lightnerx::communication {
 
     private:
         void callAuthorityInterpretedCallbacks(Message message) {
-            for (const auto& callback: authorityInterpretedMessageCallbacks) {
-                callback(message);
+            const auto count = authorityInterpretedMessageCallbacks.size();
+            for (std::size_t i = 0; i < count; ++i) {
+                authorityInterpretedMessageCallbacks[i](message);
             }
         }
 
         void callObedientInterpretedCallbacks(Message message, uint16_t id) {
-            for (const auto& callback: obedientInterpretedMessageCallbacks) {
-                callback(message, id);
+            const auto count = obedientInterpretedMessageCallbacks.size();
+            for (std::size_t i = 0; i < count; ++i) {
+                obedientInterpretedMessageCallbacks[i](message, id);
             }
         }
     };
@@ -177,8 +198,7 @@ export namespace lightnerx::communication {
         const std::span<const std::byte> payload,
         lightnerx::network::Target target
     ) {
-        const auto size = sizeof(event) + payload.size();
-        auto* message = SteamNetworkingUtils()->AllocateMessage(static_cast<int>(size));
+        auto* message = detail::allocateMessage(sizeof(event), payload.size());
 
         std::memcpy(message->m_pData, &event, sizeof(event));
 
@@ -194,8 +214,7 @@ export namespace lightnerx::communication {
         const std::span<const std::byte> payload,
         lightnerx::network::Target target
     ) {
-        const auto size = sizeof(intention) + payload.size();
-        auto* message = SteamNetworkingUtils()->AllocateMessage(static_cast<int>(size));
+        auto* message = detail::allocateMessage(sizeof(intention), payload.size());
 
         std::memcpy(message->m_pData, &intention, sizeof(intention));
 
@@ -211,8 +230,7 @@ export namespace lightnerx::communication {
         const std::span<const std::byte> payload,
         lightnerx::network::Target target
     ) {
-        const auto size = sizeof(response) + payload.size();
-        auto* message = SteamNetworkingUtils()->AllocateMessage(static_cast<int>(size));
+        auto* message = detail::allocateMessage(sizeof(response), payload.size());
 
         std::memcpy(message->m_pData, &response, sizeof(response));
 
@@ -228,8 +246,7 @@ export namespace lightnerx::communication {
         const std::span<const std::byte> payload,
         lightnerx::network::Target target
     ) {
-        const auto size = sizeof(response) + payload.size();
-        auto* message = SteamNetworkingUtils()->AllocateMessage(static_cast<int>(size));
+        auto* message = detail::allocateMessage(sizeof(response), payload.size());
 
         std::memcpy(message->m_pData, &response, sizeof(response));
 
@@ -245,8 +262,7 @@ export namespace lightnerx::communication {
         const std::span<const std::byte> payload,
         lightnerx::network::Target target
     ) {
-        const auto size = sizeof(notification) + payload.size();
-        auto* message = SteamNetworkingUtils()->AllocateMessage(static_cast<int>(size));
+        auto* message = detail::allocateMessage(sizeof(notification), payload.size());
 
         std::memcpy(message->m_pData, &notification, sizeof(notification));
 

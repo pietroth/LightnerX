@@ -14,7 +14,7 @@ LightnerX provides reusable components. The consuming application decides:
 - how to organize the connection lifecycle;
 - which modules to use or replace with its own implementations.
 
-For example, you can pass bytes from your own transport to `lightnerx::communication::MessageInterpreter`. To interpret messages from the Obedient, `obedientInterpret` takes a `lightnerx::network::ConnectionManager`; an application that manages connections on its own must maintain the mapping between handles and IDs used by the interpreter in that object.
+For example, you can pass one complete INER message from your own transport to `lightnerx::communication::MessageInterpreter`. `authorityInterpret` does not require a connection. `obedientInterpret` requires a `lightnerx::network::ConnectionManager` registration: `add()` accepts only live GNS handles, so arbitrary identifiers from another transport are not supported by that path. The manager stores its own mapping and does not use GNS connection userdata.
 
 ## Key concepts
 
@@ -24,6 +24,32 @@ For example, you can pass bytes from your own transport to `lightnerx::communica
 - **Response:** the result of an intention sent by the Obedient.
 - **Intention:** an action request sent to the Authority.
 - **Notification:** information sent to the Authority without requesting a state change.
+
+### INER message flow
+
+The INER protocol defines four message types exchanged between the Authority and the Obedient:
+
+```mermaid
+flowchart LR
+    A["🖥️ AUTHORITY<br/>Server"]
+    O["💻 OBEDIENT<br/>Client"]
+
+    A -->|EVENT| O
+    A -->|RESPONSE| O
+    O -->|INTENTION| A
+    O -->|NOTIFICATION| A
+
+    classDef authority fill:#123456,stroke:#2699ff,color:#fff,stroke-width:2px
+    classDef obedient fill:#302050,stroke:#a76bee,color:#fff,stroke-width:2px
+
+    class A authority
+    class O obedient
+
+    linkStyle 0 stroke:#2596ee,stroke-width:3px
+    linkStyle 1 stroke:#16a085,stroke-width:3px
+    linkStyle 2 stroke:#e69b27,stroke-width:3px
+    linkStyle 3 stroke:#a76bee,stroke-width:3px
+```
 
 In LightnerX, the application connects components through callbacks: the network delivers bytes, and `MessageInterpreter` interprets those bytes according to the direction of communication. When sending, `lightnerx::network::Target` lets you select a connection, a group, or a broadcast with or without exceptions.
 
@@ -422,3 +448,7 @@ int main() {
     return 1; // The Client destructor closes the connection and shuts down the network.
 }
 ```
+
+## Runtime contracts
+
+One started `Client` or `Server` owns networking per process. Both classes have stable addresses and cannot be copied or moved. `Server::close()` and either owner's destructor release the runtime; a client can disconnect and reconnect without being destroyed. Direct `networkInit()` / `networkKill()` remain available when using the transport without a wrapper. See [API reference](docs/api.md) for shutdown, callback exceptions, reentrancy and message validation contracts.

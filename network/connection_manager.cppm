@@ -15,33 +15,35 @@ export namespace lightnerx::network {
     class ConnectionManager {
     private:
         std::vector<HSteamNetConnection> clients;
+        std::unordered_map<HSteamNetConnection, uint16_t> clientIds;
         int maxCapacity;
         int onlineCount;
 
         std::set<uint16_t> freeIds;
-        uint16_t nextId = 0;
-
-        uint16_t getId() {
-            if (!freeIds.empty()) {
-                uint16_t reusedId = *freeIds.begin();
-                freeIds.erase(freeIds.begin());
-                return reusedId;
-            }
-
-            return nextId += 1;
-        }
-
-        void freeId(uint16_t id) {
-            if (id < nextId) {
-                freeIds.insert(id);
-            }
-        }
+        uint32_t nextId = 1;
+        static constexpr uint32_t maxId = std::numeric_limits<uint16_t>::max();
 
     public:
         ConnectionManager(int initialReserve, int maxCapacity) {
-            clients.reserve(initialReserve);
-            this->maxCapacity = maxCapacity;
+            if (initialReserve < 0 || maxCapacity < 0) {
+                throw std::invalid_argument("ConnectionManager capacities must be nonnegative");
+            }
+            this->maxCapacity = std::min(maxCapacity, static_cast<int>(maxId));
+            clients.reserve(std::min(initialReserve, this->maxCapacity) + 1);
             onlineCount = 0;
+        }
+
+        ConnectionManager(const ConnectionManager&) = default;
+        ConnectionManager(ConnectionManager&&) = default;
+        ConnectionManager& operator=(ConnectionManager&&) = default;
+
+        ConnectionManager& operator=(const ConnectionManager& other) {
+            if (this != &other) {
+                // Copy every allocating member before committing with noexcept move assignment.
+                ConnectionManager replacement(other);
+                *this = std::move(replacement);
+            }
+            return *this;
         }
 
         HSteamNetConnection getHSteamNetConnection(uint16_t id) const noexcept {
@@ -53,17 +55,9 @@ export namespace lightnerx::network {
         }
 
         std::optional<uint16_t> getClientId(HSteamNetConnection hConn) const noexcept {
-            if (!isNetworkInitialized()) {
-                return std::nullopt;
-            }
-
-            ISteamNetworkingSockets* sockets = SteamNetworkingSockets();
-
-            int64 connectionId = sockets->GetConnectionUserData(hConn);
-            if (connectionId < 0 || connectionId > 65535) {
-                return false;
-            }
-            return static_cast<uint16_t>(connectionId);
+            const auto entry = clientIds.find(hConn);
+            if (entry == clientIds.end()) return std::nullopt;
+            return entry->second;
         }
 
         std::optional<uint16_t> add(HSteamNetConnection hConn) {
@@ -71,22 +65,26 @@ export namespace lightnerx::network {
                 return {};
             }
 
-            if (onlineCount >= maxCapacity) {
+            if (onlineCount >= maxCapacity || hConn == invalidConnection || clientIds.contains(hConn)) {
                 return {};
             }
 
             ISteamNetworkingSockets* sockets = SteamNetworkingSockets();
-
-            uint16_t id = getId();
-
-            if (!sockets->SetConnectionUserData(hConn, id)) {
-                freeId(id);
+            SteamNetConnectionInfo_t info;
+            if (!sockets || !sockets->GetConnectionInfo(hConn, &info)) {
                 return std::nullopt;
             }
 
+            if (freeIds.empty() && nextId > maxId) return std::nullopt;
+            const uint16_t id = freeIds.empty() ? static_cast<uint16_t>(nextId) : *freeIds.begin();
+
+            // Complete all allocating operations before committing the new ID.
             if (id >= clients.size()) {
-                clients.resize(id + 16);
+                clients.resize(std::min(static_cast<size_t>(id) + 16, static_cast<size_t>(maxId) + 1));
             }
+            clientIds.emplace(hConn, id);
+            if (freeIds.empty()) ++nextId;
+            else freeIds.erase(freeIds.begin());
 
             clients[id] = hConn;
             onlineCount++;
@@ -105,12 +103,10 @@ export namespace lightnerx::network {
                 return;
             }
 
-            if (isNetworkInitialized()) {
-                SteamNetworkingSockets()->SetConnectionUserData(hConn, -1);
-            }
-
+            // Insertion may allocate. Leave the registration intact on failure.
+            freeIds.insert(static_cast<uint16_t>(id));
+            clientIds.erase(hConn);
             clients[id] = invalidConnection;
-            freeId(id);
             onlineCount--;
         }
 
@@ -118,12 +114,15 @@ export namespace lightnerx::network {
             return onlineCount;
         }
 
-        void forEach(const auto& callback) const noexcept {
-            for (uint16_t id = 0; id < clients.size(); ++id) {
+        void forEach(const auto& callback) const {
+            // Reload by index after each callback: add/remove may reallocate clients.
+            // The entry-time bound prevents additions from extending this traversal.
+            const size_t limit = clients.size();
+            for (size_t id = 1; id < limit && id < clients.size(); ++id) {
                 HSteamNetConnection hConn = clients[id];
 
                 if (hConn != invalidConnection) {
-                    callback(id, hConn);
+                    callback(static_cast<uint16_t>(id), hConn);
                 }
             }
         }
