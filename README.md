@@ -1,4 +1,4 @@
-# LightnerX
+![LightnerX](docs/LightnerX%20Framed%20Wordmark.png)
 
 LightnerX is a modular static C++ library for building applications that communicate using the INER semantic protocol. The CMake project provides the `LightnerX` target; it neither produces nor requires its own executable. The library provides types for representing messages, interpreters, callbacks, connection management, and a transport layer based on GameNetworkingSockets.
 
