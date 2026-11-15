@@ -78,3 +78,5 @@ set_tests_properties(lightnerx.consumer PROPERTIES
     TIMEOUT 600
     ENVIRONMENT "CMAKE_BUILD_PARALLEL_LEVEL=2"
 )
+
+add_subdirectory(compact)
