@@ -1,12 +1,13 @@
-"""Supplement module tests with faults in actual wrapper bodies and real GNS.
+"""Supplement library tests with faults in actual wrapper bodies and real GNS.
 
-Strip module declarations, expose private test state, and replace transport calls
+Compose headers and sources, expose private test state, and replace transport calls
 at specific failure boundaries. No production testing API or third-party edits.
 """
 import argparse
 from pathlib import Path
 import subprocess
 import tempfile
+from source_support import body
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--compiler', default='c++')
@@ -63,11 +64,13 @@ void runServerCallbacks() {
 EResult acceptConnection(HSteamNetConnection) { return k_EResultOK; }
 '''
 for name in ['network_manager', 'client', 'server']:
-    path = 'network/' + name + '.cppm'
-    code = (subprocess.check_output(['git', 'show', 'HEAD:' + path], cwd=root, text=True)
-            if args.baseline else (root / path).read_text())
-    code = '\n'.join(line.replace('export ', '') for line in code.splitlines()
-                     if not line.startswith(('module;', 'export module ', 'import ', 'export import ')))
+    if args.baseline:
+        path = 'network/' + name + '.cppm'
+        code = subprocess.check_output(['git', 'show', '541ae1d39225ec9b747b9f888f96242a710e9073:' + path], cwd=root, text=True)
+        code = '\n'.join(line.replace('export ', '') for line in code.splitlines()
+                         if not line.startswith(('module;', 'export module ', 'import ', 'export import ')))
+    else:
+        code = body('network/' + name + '.cpp')
     code = code.replace('private:', 'public:')
     for original, replacement in [
         ('m_sockets->ReceiveMessagesOnConnection(', 'receiveClient('),

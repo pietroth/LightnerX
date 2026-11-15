@@ -1,23 +1,20 @@
 #!/usr/bin/env python3
 """Compile production bodies with deterministic transport/allocation fault injection.
 
-Only module/import declarations and the SteamNetworkingUtils accessor are changed.
-The normal CMake messages target independently tests the real modules and GNS.
+Only dependency includes and the SteamNetworkingUtils accessor are changed.
+The normal CMake messages target independently tests the real library and GNS.
 """
 import argparse
 import pathlib
 import subprocess
 import tempfile
+from source_support import body
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--compiler', default='g++')
 parser.add_argument('--sanitize', action='store_true')
 args = parser.parse_args()
 root = pathlib.Path(__file__).resolve().parent.parent
-
-def body(path):
-    return '\n'.join(line.replace('export ', '') for line in (root / path).read_text().splitlines()
-                     if not line.startswith(('module;', 'export module ', 'import ', 'export import ')))
 
 source = r'''
 #define LIGHTNERX_SOURCE_TEST
@@ -66,10 +63,10 @@ namespace lightnerx::network {
     }
 }
 '''
-for path in ['communication/base_protocol.cppm', 'communication/mbt.cppm',
-             'communication/intention.cppm', 'communication/notification.cppm',
-             'communication/event.cppm', 'communication/response.cppm',
-             'network/target.cppm', 'network/message_batch.cppm', 'communication/message.cppm']:
+for path in ['communication/base_protocol.cpp', 'communication/mbt.cpp',
+             'communication/intention.cpp', 'communication/notification.cpp',
+             'communication/event.cpp', 'communication/response.cpp',
+             'network/target.cpp', 'network/message_batch.cpp', 'communication/message.cpp']:
     source += '\n' + body(path).replace('SteamNetworkingUtils()', 'injectedUtils()')
 source += '\n' + (root / 'tests/messages.cpp').read_text()
 with tempfile.TemporaryDirectory(prefix='lightnerx-message-test-') as directory:

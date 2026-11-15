@@ -2,19 +2,31 @@
 #include <steam/isteamnetworkingsockets.h>
 #include <cstddef>
 
-import std;
-import lightnerx.communication.message;
-import lightnerx.communication.event;
-import lightnerx.communication.intention;
-import lightnerx.communication.notification;
-import lightnerx.communication.response;
-import lightnerx.network.target;
-import lightnerx.network.message_batch;
-import lightnerx.network.connection_manager;
-import lightnerx.network.network_manager;
-import lightnerx.network.client;
-import lightnerx.network.server;
-import lightnerx.network.transport;
+#include <array>
+#include <cstddef>
+#include <cstdint>
+#include <cstring>
+#include <exception>
+#include <expected>
+#include <iostream>
+#include <span>
+#include <stdexcept>
+#include <system_error>
+#include <type_traits>
+#include <variant>
+#include <vector>
+#include <lightnerx/communication/message.hpp>
+#include <lightnerx/communication/event.hpp>
+#include <lightnerx/communication/intention.hpp>
+#include <lightnerx/communication/notification.hpp>
+#include <lightnerx/communication/response.hpp>
+#include <lightnerx/network/target.hpp>
+#include <lightnerx/network/message_batch.hpp>
+#include <lightnerx/network/connection_manager.hpp>
+#include <lightnerx/network/network_manager.hpp>
+#include <lightnerx/network/client.hpp>
+#include <lightnerx/network/server.hpp>
+#include <lightnerx/network/transport.hpp>
 
 namespace c = lightnerx::communication;
 namespace n = lightnerx::network;

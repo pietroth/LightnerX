@@ -1,4 +1,4 @@
-"""Exercise the public Client and Server modules in separate processes over UDP."""
+"""Exercise the public Client and Server in separate processes over UDP."""
 import pathlib
 import socket
 import subprocess

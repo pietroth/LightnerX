@@ -1,9 +1,13 @@
 #include <steam/steamnetworkingsockets.h>
 #include <steam/isteamnetworkingsockets.h>
 
-import std;
-import lightnerx.network.network_manager;
-import lightnerx.network.connection_manager;
+#include <cstdint>
+#include <exception>
+#include <iostream>
+#include <print>
+#include <stdexcept>
+#include <lightnerx/network/network_manager.hpp>
+#include <lightnerx/network/connection_manager.hpp>
 
 namespace {
 void check(bool condition, const char* message) {
