@@ -1,0 +1,16 @@
+{
+  "revision": "541ae1d39225ec9b747b9f888f96242a710e9073",
+  "dependency": "GameNetworkingSockets d534c19aa760df3fb75fd20db13ba1932b8a5463",
+  "platform": "Linux x86_64, little-endian",
+  "compiler": "GCC/libstdc++ 15.2.0, C++26 named modules",
+  "cmake": "4.2.3",
+  "ninja": "1.13.2",
+  "protobuf": "3.21.12",
+  "openssl": "3.6.5",
+  "existing_tests": {"passed": 9, "failed": 0, "skipped": 0},
+  "corpus_seed": "0x4c58",
+  "parser_invocations": 13275,
+  "delivered_messages": 1897,
+  "fixture": "cpp26-behavior.txt",
+  "normalization": "No addresses, runtime handles, ports, timings or locale-dependent error messages are recorded."
+}

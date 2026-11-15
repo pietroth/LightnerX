@@ -12,6 +12,14 @@ foreach(test_name IN ITEMS connection_manager connection_manager_assignment mess
 endforeach()
 
 find_package(Python3 REQUIRED COMPONENTS Interpreter)
+add_executable(lightnerx_test_characterization characterization.cpp)
+target_link_libraries(lightnerx_test_characterization PRIVATE LightnerX)
+add_test(NAME lightnerx.characterization
+    COMMAND ${Python3_EXECUTABLE} "${CMAKE_CURRENT_SOURCE_DIR}/characterization.py"
+        "$<TARGET_FILE:lightnerx_test_characterization>"
+        "${CMAKE_CURRENT_SOURCE_DIR}/fixtures/cpp26-behavior.txt")
+set_tests_properties(lightnerx.characterization PROPERTIES TIMEOUT 60)
+
 set(domain_test_flags "${CMAKE_CXX_FLAGS}")
 if(LIGHTNERX_SANITIZERS)
     # These supplemental tests compile implementation bodies without modules;
