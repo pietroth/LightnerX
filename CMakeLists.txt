@@ -1,7 +1,5 @@
 cmake_minimum_required(VERSION 4.2)
 
-set(CMAKE_EXPERIMENTAL_CXX_IMPORT_STD "d0edc3af-4c50-42ea-a356-e2862fe7a444")
-set(CMAKE_CXX_MODULE_STD ON)
 
 project(LightnerX LANGUAGES C CXX)
 
@@ -18,7 +16,6 @@ add_subdirectory(external/GameNetworkingSockets)
 
 add_library(LightnerX STATIC)
 target_compile_features(LightnerX PUBLIC cxx_std_26)
-set_target_properties(LightnerX PROPERTIES CXX_MODULE_STD ON)
 
 set(LIGHTNERX_SANITIZERS "" CACHE STRING "Sanitizers for LightnerX and consumers, e.g. address or address,undefined")
 if(LIGHTNERX_SANITIZERS)
@@ -35,8 +32,8 @@ add_subdirectory(communication)
 add_subdirectory(network)
 
 target_include_directories(LightnerX
-    PRIVATE
-        ${CMAKE_CURRENT_SOURCE_DIR}
+    PUBLIC
+        ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
 
 target_link_libraries(LightnerX

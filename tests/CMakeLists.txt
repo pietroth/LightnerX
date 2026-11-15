@@ -80,3 +80,17 @@ set_tests_properties(lightnerx.consumer PROPERTIES
 )
 
 add_subdirectory(compact)
+
+# Each public header must compile as the first and only project include.
+file(GLOB_RECURSE lightnerx_public_headers CONFIGURE_DEPENDS
+    "${PROJECT_SOURCE_DIR}/include/lightnerx/*.hpp")
+set(header_checks)
+foreach(header IN LISTS lightnerx_public_headers)
+    file(RELATIVE_PATH include_name "${PROJECT_SOURCE_DIR}/include" "${header}")
+    string(MAKE_C_IDENTIFIER "${include_name}" check_name)
+    set(check_source "${CMAKE_CURRENT_BINARY_DIR}/headers/${check_name}.cpp")
+    file(WRITE "${check_source}" "#include <${include_name}>\n#include <${include_name}>\n")
+    list(APPEND header_checks "${check_source}")
+endforeach()
+add_library(lightnerx_header_checks OBJECT ${header_checks})
+target_link_libraries(lightnerx_header_checks PRIVATE LightnerX)

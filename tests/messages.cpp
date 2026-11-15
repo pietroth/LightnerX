@@ -1,16 +1,28 @@
 #ifndef LIGHTNERX_SOURCE_TEST
 #include <steam/steamnetworkingsockets.h>
 #include <steam/isteamnetworkingutils.h>
-import std;
-import lightnerx.communication.message;
-import lightnerx.communication.event;
-import lightnerx.communication.notification;
-import lightnerx.communication.intention;
-import lightnerx.communication.response;
-import lightnerx.network.target;
-import lightnerx.network.message_batch;
-import lightnerx.network.connection_manager;
-import lightnerx.network.network_manager;
+#include <array>
+#include <cstddef>
+#include <cstdint>
+#include <cstring>
+#include <exception>
+#include <functional>
+#include <iostream>
+#include <limits>
+#include <new>
+#include <span>
+#include <stdexcept>
+#include <variant>
+#include <vector>
+#include <lightnerx/communication/message.hpp>
+#include <lightnerx/communication/event.hpp>
+#include <lightnerx/communication/notification.hpp>
+#include <lightnerx/communication/intention.hpp>
+#include <lightnerx/communication/response.hpp>
+#include <lightnerx/network/target.hpp>
+#include <lightnerx/network/message_batch.hpp>
+#include <lightnerx/network/connection_manager.hpp>
+#include <lightnerx/network/network_manager.hpp>
 #endif
 
 using namespace lightnerx::communication;

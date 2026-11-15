@@ -1,18 +1,14 @@
-module;
+#include <lightnerx/network/network_manager.hpp>
 
-#include <steam/steamnetworkingsockets.h>
-
-export module lightnerx.network.network_manager;
-
-import std;
+#include <expected>
+#include <system_error>
 
 namespace lightnerx::network::detail {
     const void* networkOwner = nullptr;
     void (*networkCleanup)() noexcept = nullptr;
 }
 
-export namespace lightnerx::network {
-    inline constexpr HSteamNetConnection k_invalidConnection = k_HSteamNetConnection_Invalid;
+namespace lightnerx::network {
     bool g_bNetworkInitialized = false;
 
     bool networkInit() {

@@ -40,6 +40,8 @@ Thumbs.db
 
 # Cache
 .cache/
+__pycache__/
+*.py[cod]
 
 # Local library testing
 /main.cpp

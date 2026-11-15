@@ -1,13 +1,21 @@
 target_sources(LightnerX
+    PRIVATE
+        base_protocol.cpp
+        event.cpp
+        intention.cpp
+        mbt.cpp
+        message.cpp
+        notification.cpp
+        response.cpp
     PUBLIC
-        FILE_SET CXX_MODULES
-        BASE_DIRS "${PROJECT_SOURCE_DIR}"
+        FILE_SET HEADERS
+        BASE_DIRS "${PROJECT_SOURCE_DIR}/include"
         FILES
-            event.cppm
-            base_protocol.cppm
-            mbt.cppm
-            intention.cppm
-            notification.cppm
-            response.cppm
-            message.cppm
+            "${PROJECT_SOURCE_DIR}/include/lightnerx/communication/base_protocol.hpp"
+            "${PROJECT_SOURCE_DIR}/include/lightnerx/communication/event.hpp"
+            "${PROJECT_SOURCE_DIR}/include/lightnerx/communication/intention.hpp"
+            "${PROJECT_SOURCE_DIR}/include/lightnerx/communication/mbt.hpp"
+            "${PROJECT_SOURCE_DIR}/include/lightnerx/communication/message.hpp"
+            "${PROJECT_SOURCE_DIR}/include/lightnerx/communication/notification.hpp"
+            "${PROJECT_SOURCE_DIR}/include/lightnerx/communication/response.hpp"
 )

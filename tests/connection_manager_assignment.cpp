@@ -1,9 +1,23 @@
 #include <steam/steamnetworkingsockets.h>
 #include <steam/isteamnetworkingsockets.h>
 
-import std;
-import lightnerx.network.network_manager;
-import lightnerx.network.connection_manager;
+#include <algorithm>
+#include <array>
+#include <cstddef>
+#include <cstdint>
+#include <cstdlib>
+#include <exception>
+#include <initializer_list>
+#include <iostream>
+#include <new>
+#include <optional>
+#include <print>
+#include <span>
+#include <stdexcept>
+#include <type_traits>
+#include <utility>
+#include <lightnerx/network/network_manager.hpp>
+#include <lightnerx/network/connection_manager.hpp>
 
 namespace {
 // Restrict fault injection to the assigning thread, leaving GNS workers alone.

@@ -1,12 +1,12 @@
-module;
+#ifndef LIGHTNERX_COMMUNICATION_RESPONSE_HPP
+#define LIGHTNERX_COMMUNICATION_RESPONSE_HPP
 
-export module lightnerx.communication.response;
 
-import std;
+#include <cstdint>
 
-import lightnerx.communication.base_protocol;
+#include <lightnerx/communication/base_protocol.hpp>
 
-export namespace lightnerx::communication {
+namespace lightnerx::communication {
     using namespace lightnerx::communication;
 
     constexpr std::uint8_t APPROVED_RESPONSE = 0;
@@ -21,8 +21,7 @@ export namespace lightnerx::communication {
         std::uint16_t correlationId; // 2 bytes
         std::uint8_t status; // 1 byte
 
-        Response(std::uint16_t size, std::uint16_t correlationId, std::uint8_t status)
-        :   protocol(size), correlationId(correlationId), status(status) {}
+        Response(std::uint16_t size, std::uint16_t correlationId, std::uint8_t status);
     }; // Approved and Failure share the same header.
 
     struct UnsuccessfulResponse {
@@ -31,9 +30,9 @@ export namespace lightnerx::communication {
         std::uint8_t status; // 1 byte
         std::uint16_t reasonCode; // 2 bytes
 
-        UnsuccessfulResponse(std::uint16_t size, std::uint16_t correlationId, std::uint8_t status, std::uint16_t reasonCode)
-        : protocol(size), correlationId(correlationId), status(status), reasonCode(reasonCode) {}
+        UnsuccessfulResponse(std::uint16_t size, std::uint16_t correlationId, std::uint8_t status, std::uint16_t reasonCode);
     }; // Denied and PartiallyApproved share the same header.
 
     #pragma pack(pop)
 }
+#endif

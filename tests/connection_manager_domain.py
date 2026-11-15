@@ -1,23 +1,22 @@
 #!/usr/bin/env python3
 """Exercise all 65535 IDs with a fake GNS interface and the actual manager body.
 
-The normal C++ test imports the real module and uses real GNS socket pairs. This
-additional test strips only module/import/include declarations and substitutes a
-minimal GNS interface to avoid requiring 65536 live network connections.
+The normal C++ test links the real library and uses real GNS socket pairs. This
+additional test substitutes a minimal GNS interface to avoid requiring 65536
+live network connections.
 """
 import argparse
 from pathlib import Path
 import shlex
 import subprocess
 import tempfile
+from source_support import body
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--compiler", default="c++")
-parser.add_argument("--source", type=Path, default=Path(__file__).resolve().parents[1] / "network/connection_manager.cppm")
 parser.add_argument("--flags", default="")
 args = parser.parse_args()
-source = args.source.read_text()
-source = source[source.index("export namespace"):].replace("export namespace", "namespace", 1)
+source = body('network/connection_manager.cpp', steam=False)
 preamble = r'''
 #include <algorithm>
 #include <cstdint>

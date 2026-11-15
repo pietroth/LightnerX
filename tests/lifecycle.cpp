@@ -1,12 +1,24 @@
 #include <steam/steamnetworkingsockets.h>
 #include <steam/isteamnetworkingutils.h>
 
-import std;
-import lightnerx.network.client;
-import lightnerx.network.server;
-import lightnerx.network.transport;
-import lightnerx.network.connection_manager;
-import lightnerx.network.network_manager;
+#include <array>
+#include <chrono>
+#include <cstddef>
+#include <exception>
+#include <iostream>
+#include <print>
+#include <span>
+#include <stdexcept>
+#include <string>
+#include <string_view>
+#include <system_error>
+#include <thread>
+#include <type_traits>
+#include <lightnerx/network/client.hpp>
+#include <lightnerx/network/server.hpp>
+#include <lightnerx/network/transport.hpp>
+#include <lightnerx/network/connection_manager.hpp>
+#include <lightnerx/network/network_manager.hpp>
 
 using namespace lightnerx::network;
 using namespace std::chrono_literals;

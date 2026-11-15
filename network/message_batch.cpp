@@ -1,22 +1,15 @@
-module;
+#include <lightnerx/network/message_batch.hpp>
 
-#include "steam/isteamnetworkingutils.h"
-#include <steam/steamnetworkingtypes.h>
-
-export module lightnerx.network.message_batch;
-
-import std;
-
-import lightnerx.network.transport;
-import lightnerx.network.network_manager;
-import lightnerx.network.target;
-import lightnerx.network.connection_manager;
+#include <cstddef>
+#include <expected>
+#include <span>
+#include <stdexcept>
+#include <system_error>
+#include <utility>
+#include <variant>
+#include <vector>
 
 namespace lightnerx::network {
-    export struct OutboundMessage {
-        SteamNetworkingMessage_t* message;
-        Target target;
-    };
 
     struct MessageQueue {
         std::vector<OutboundMessage> messages;
@@ -36,17 +29,17 @@ namespace lightnerx::network {
 
     MessageQueue pending;
 
-    export void clearMessagesBatcher() noexcept {
+    void clearMessagesBatcher() noexcept {
         pending.clear();
     }
 
-    export void initMessagesBatcher(int capacity) {
+    void initMessagesBatcher(int capacity) {
         if (capacity < 0) throw std::invalid_argument("Negative batch capacity");
         detail::setNetworkCleanup(&clearMessagesBatcher);
         pending.messages.reserve(static_cast<std::size_t>(capacity));
     }
 
-    export std::expected<void, std::error_code> queueMessage(
+    std::expected<void, std::error_code> queueMessage(
         OutboundMessage message
     ) {
         detail::setNetworkCleanup(&clearMessagesBatcher);
@@ -63,7 +56,7 @@ namespace lightnerx::network {
         return {};
     }
 
-    export std::expected<void, std::error_code> flushAll(
+    std::expected<void, std::error_code> flushAll(
         const ConnectionManager& connectionManager
     ) {
         struct ReleasePending {

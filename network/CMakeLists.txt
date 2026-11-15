@@ -1,23 +1,21 @@
-set(NETWORK_SOURCES)
-set(NETWORK_MODULES
-    server.cppm
-    client.cppm
-    connection_manager.cppm
-    transport.cppm
-    network_manager.cppm
-    message_batch.cppm
-    target.cppm
+target_sources(LightnerX
+    PRIVATE
+        client.cpp
+        connection_manager.cpp
+        message_batch.cpp
+        network_manager.cpp
+        server.cpp
+        target.cpp
+        transport.cpp
+    PUBLIC
+        FILE_SET HEADERS
+        BASE_DIRS "${PROJECT_SOURCE_DIR}/include"
+        FILES
+            "${PROJECT_SOURCE_DIR}/include/lightnerx/network/client.hpp"
+            "${PROJECT_SOURCE_DIR}/include/lightnerx/network/connection_manager.hpp"
+            "${PROJECT_SOURCE_DIR}/include/lightnerx/network/message_batch.hpp"
+            "${PROJECT_SOURCE_DIR}/include/lightnerx/network/network_manager.hpp"
+            "${PROJECT_SOURCE_DIR}/include/lightnerx/network/server.hpp"
+            "${PROJECT_SOURCE_DIR}/include/lightnerx/network/target.hpp"
+            "${PROJECT_SOURCE_DIR}/include/lightnerx/network/transport.hpp"
 )
-
-if(NETWORK_SOURCES)
-    target_sources(LightnerX PUBLIC ${NETWORK_SOURCES})
-endif()
-
-if(NETWORK_MODULES)
-    target_sources(LightnerX
-        PUBLIC
-            FILE_SET CXX_MODULES
-        BASE_DIRS "${PROJECT_SOURCE_DIR}"
-        FILES ${NETWORK_MODULES}
-    )
-endif()
