@@ -24,6 +24,7 @@ protected:
     bad_expected_access(bad_expected_access&&) = default;
     bad_expected_access& operator=(const bad_expected_access&) = default;
     bad_expected_access& operator=(bad_expected_access&&) = default;
+    ~bad_expected_access() = default;
 public:
     const char* what() const noexcept override { return "bad access to lightnerx::compact::expected"; }
 };
@@ -39,6 +40,11 @@ public:
 
 namespace expected_detail {
 template<class T> using remove_cvref_t = std::remove_cv_t<std::remove_reference_t<T>>;
+template<class To> void conversion_sink(To) noexcept;
+template<class From, class To, bool = std::is_convertible_v<From, To>>
+struct nothrow_convertible : std::false_type {};
+template<class From, class To> struct nothrow_convertible<From, To, true>
+    : std::bool_constant<noexcept(conversion_sink<To>(std::declval<From>()))> {};
 template<class> struct is_unexpected : std::false_type {};
 template<class E> struct is_unexpected<unexpected<E>> : std::true_type {};
 template<class> struct is_expected : std::false_type {};
@@ -707,10 +713,10 @@ public:
         return expected_detail::transform_error(std::move(*this), std::forward<F>(function));
     }
 
-    template<class U, class Value = T, std::enable_if_t<!std::is_void_v<Value>, int> = 0>
+    template<class U = std::remove_cv_t<T>, class Value = T, std::enable_if_t<!std::is_void_v<Value>, int> = 0>
     constexpr Value value_or(U&& fallback) const &
         noexcept(std::is_nothrow_copy_constructible_v<Value> &&
-                 std::is_nothrow_constructible_v<Value, U>) {
+                 expected_detail::nothrow_convertible<U, Value>::value) {
         static_assert(std::is_copy_constructible_v<Value> && std::is_convertible_v<U, Value>);
         if (has_value()) return this->data_.value;
         return static_cast<Value>(std::forward<U>(fallback));
@@ -721,10 +727,10 @@ public:
         return this->data_.error;
     }
 
-    template<class U, class Value = T, std::enable_if_t<!std::is_void_v<Value>, int> = 0>
+    template<class U = std::remove_cv_t<T>, class Value = T, std::enable_if_t<!std::is_void_v<Value>, int> = 0>
     constexpr Value value_or(U&& fallback) &&
         noexcept(std::is_nothrow_move_constructible_v<Value> &&
-                 std::is_nothrow_constructible_v<Value, U>) {
+                 expected_detail::nothrow_convertible<U, Value>::value) {
         static_assert(std::is_move_constructible_v<Value> && std::is_convertible_v<U, Value>);
         if (has_value()) return std::move(this->data_.value);
         return static_cast<Value>(std::forward<U>(fallback));
