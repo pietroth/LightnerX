@@ -1,0 +1,35 @@
+option(LIGHTNERX_BUILD_NATIVE_REFERENCE_TESTS "Compare compact with native C++20/23 types" OFF)
+
+function(lightnerx_compact_test name standard native)
+    set(target lightnerx_test_compact_${name})
+    if(native)
+        set(target lightnerx_test_native_${name})
+    endif()
+    add_executable(${target} ${name}.cpp)
+    target_include_directories(${target} PRIVATE "${PROJECT_SOURCE_DIR}/include")
+    set_target_properties(${target} PROPERTIES
+        CXX_STANDARD ${standard} CXX_STANDARD_REQUIRED ON CXX_EXTENSIONS OFF
+        CXX_MODULE_STD OFF CXX_SCAN_FOR_MODULES OFF)
+    if(native)
+        target_compile_definitions(${target} PRIVATE LIGHTNERX_NATIVE_REFERENCE)
+    endif()
+    if(MSVC)
+        target_compile_options(${target} PRIVATE /UNDEBUG)
+    else()
+        target_compile_options(${target} PRIVATE -UNDEBUG -Wall -Wextra -pedantic-errors)
+    endif()
+    if(LIGHTNERX_SANITIZERS)
+        target_compile_options(${target} PRIVATE "-fsanitize=${LIGHTNERX_SANITIZERS}" -fno-omit-frame-pointer -fno-sanitize-recover=all)
+        target_link_options(${target} PRIVATE "-fsanitize=${LIGHTNERX_SANITIZERS}")
+    endif()
+    add_test(NAME ${target} COMMAND ${target})
+    set_tests_properties(${target} PROPERTIES TIMEOUT 60)
+endfunction()
+
+lightnerx_compact_test(span 17 FALSE)
+if(LIGHTNERX_BUILD_NATIVE_REFERENCE_TESTS)
+    lightnerx_compact_test(span 20 TRUE)
+    add_test(NAME lightnerx.compact_span_parity COMMAND ${Python3_EXECUTABLE}
+        "${CMAKE_CURRENT_SOURCE_DIR}/compare.py"
+        "$<TARGET_FILE:lightnerx_test_compact_span>" "$<TARGET_FILE:lightnerx_test_native_span>")
+endif()
