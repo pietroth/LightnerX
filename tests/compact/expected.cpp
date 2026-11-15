@@ -22,6 +22,11 @@ using subject::unexpect;
 
 struct NoDefault { explicit NoDefault(int) {} };
 struct Explicit { explicit Explicit(int n) : value(n) {} int value; };
+struct FallbackSource {};
+struct FallbackValue {
+    explicit FallbackValue(FallbackSource&&) noexcept {}
+    FallbackValue(const FallbackSource&) noexcept(false) {}
+};
 struct Immovable {
     int value;
     explicit Immovable(int n) : value(n) {}
@@ -75,6 +80,9 @@ static_assert(!std::is_default_constructible_v<expected<NoDefault, int>>);
 static_assert(std::is_default_constructible_v<expected<int, NoDefault>>);
 static_assert(std::is_default_constructible_v<expected<const void, int>>);
 static_assert(!std::is_default_constructible_v<unexpected<int>>);
+static_assert(!std::is_destructible_v<subject::bad_expected_access<void>>);
+static_assert(!noexcept(std::declval<const expected<FallbackValue, int>&>().value_or(FallbackSource{})));
+static_assert(!noexcept(std::declval<expected<FallbackValue, int>&&>().value_or(FallbackSource{})));
 static_assert(!std::is_copy_assignable_v<expected<const int, int>>);
 static_assert(std::is_constructible_v<expected<Explicit, Explicit>, expected<int, int>>);
 static_assert(!std::is_convertible_v<expected<int, int>, expected<Explicit, Explicit>>);
@@ -103,6 +111,7 @@ void construction() {
     assert(error != unexpected(4) && unexpected(4) != error);
     assert((zero != error && zero == expected<long, long>(0)));
     assert(error.value_or(9) == 9 && zero.value_or(9) == 0);
+    assert(error.value_or({}) == 0 && std::move(error).value_or({}) == 0);
     assert(error.error_or(9) == 3 && zero.error_or(9) == 9);
     expected<std::vector<int>, int> list(std::in_place, {1, 2, 3});
     expected<int, std::vector<int>> error_list(unexpect, {4, 5});
