@@ -27,9 +27,20 @@ function(lightnerx_compact_test name standard native)
 endfunction()
 
 lightnerx_compact_test(span 17 FALSE)
+lightnerx_compact_test(expected 17 FALSE)
+add_test(NAME lightnerx.compact_compile_rejections COMMAND ${Python3_EXECUTABLE}
+    "${CMAKE_CURRENT_SOURCE_DIR}/negative.py" --compiler "${CMAKE_CXX_COMPILER}"
+    --include "${PROJECT_SOURCE_DIR}/include")
 if(LIGHTNERX_BUILD_NATIVE_REFERENCE_TESTS)
     lightnerx_compact_test(span 20 TRUE)
+    lightnerx_compact_test(expected 23 TRUE)
+    add_test(NAME lightnerx.native_compile_rejections COMMAND ${Python3_EXECUTABLE}
+        "${CMAKE_CURRENT_SOURCE_DIR}/negative.py" --compiler "${CMAKE_CXX_COMPILER}"
+        --include "${PROJECT_SOURCE_DIR}/include" --native)
     add_test(NAME lightnerx.compact_span_parity COMMAND ${Python3_EXECUTABLE}
         "${CMAKE_CURRENT_SOURCE_DIR}/compare.py"
         "$<TARGET_FILE:lightnerx_test_compact_span>" "$<TARGET_FILE:lightnerx_test_native_span>")
+    add_test(NAME lightnerx.compact_expected_parity COMMAND ${Python3_EXECUTABLE}
+        "${CMAKE_CURRENT_SOURCE_DIR}/compare.py"
+        "$<TARGET_FILE:lightnerx_test_compact_expected>" "$<TARGET_FILE:lightnerx_test_native_expected>")
 endif()
