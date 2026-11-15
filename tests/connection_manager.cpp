@@ -4,7 +4,6 @@
 #include <cstdint>
 #include <exception>
 #include <iostream>
-#include <print>
 #include <stdexcept>
 #include <lightnerx/network/network_manager.hpp>
 #include <lightnerx/network/connection_manager.hpp>
@@ -76,10 +75,10 @@ int main() {
 
         check(sockets->CloseConnection(b, 0, nullptr, false), "CloseConnection peer");
         networkKill();
-        std::println("ConnectionManager regressions passed");
+        std::cout << "ConnectionManager regressions passed" << '\n';
         return 0;
     } catch (const std::exception& error) {
-        std::println(std::cerr, "{}", error.what());
+        std::cerr << error.what() << '\n';
         networkKill();
         return 1;
     }

@@ -8,8 +8,7 @@ function(lightnerx_compact_test name standard native)
     add_executable(${target} ${name}.cpp)
     target_include_directories(${target} PRIVATE "${PROJECT_SOURCE_DIR}/include")
     set_target_properties(${target} PROPERTIES
-        CXX_STANDARD ${standard} CXX_STANDARD_REQUIRED ON CXX_EXTENSIONS OFF
-        CXX_MODULE_STD OFF CXX_SCAN_FOR_MODULES OFF)
+        CXX_STANDARD ${standard} CXX_STANDARD_REQUIRED ON CXX_EXTENSIONS OFF)
     if(native)
         target_compile_definitions(${target} PRIVATE LIGHTNERX_NATIVE_REFERENCE)
     endif()
@@ -30,13 +29,13 @@ lightnerx_compact_test(span 17 FALSE)
 lightnerx_compact_test(expected 17 FALSE)
 add_test(NAME lightnerx.compact_compile_rejections COMMAND ${Python3_EXECUTABLE}
     "${CMAKE_CURRENT_SOURCE_DIR}/negative.py" --compiler "${CMAKE_CXX_COMPILER}"
-    --include "${PROJECT_SOURCE_DIR}/include")
+    "--flags=${CMAKE_CXX_FLAGS}" --include "${PROJECT_SOURCE_DIR}/include")
 if(LIGHTNERX_BUILD_NATIVE_REFERENCE_TESTS)
     lightnerx_compact_test(span 20 TRUE)
     lightnerx_compact_test(expected 23 TRUE)
     add_test(NAME lightnerx.native_compile_rejections COMMAND ${Python3_EXECUTABLE}
         "${CMAKE_CURRENT_SOURCE_DIR}/negative.py" --compiler "${CMAKE_CXX_COMPILER}"
-        --include "${PROJECT_SOURCE_DIR}/include" --native)
+        "--flags=${CMAKE_CXX_FLAGS}" --include "${PROJECT_SOURCE_DIR}/include" --native)
     add_test(NAME lightnerx.compact_span_parity COMMAND ${Python3_EXECUTABLE}
         "${CMAKE_CURRENT_SOURCE_DIR}/compare.py"
         "$<TARGET_FILE:lightnerx_test_compact_span>" "$<TARGET_FILE:lightnerx_test_native_span>")

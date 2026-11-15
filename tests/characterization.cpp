@@ -7,9 +7,9 @@
 #include <cstdint>
 #include <cstring>
 #include <exception>
-#include <expected>
+#include <lightnerx/compact/expected.hpp>
 #include <iostream>
-#include <span>
+#include <lightnerx/compact/span.hpp>
 #include <stdexcept>
 #include <system_error>
 #include <type_traits>
@@ -76,7 +76,7 @@ std::vector<std::byte> wire(const char* name, n::OutboundMessage outbound) {
     return result;
 }
 
-void error(const char* name, std::expected<void, std::error_code> result) {
+void error(const char* name, lightnerx::compact::expected<void, std::error_code> result) {
     std::cout << name << '=' << (result ? 0 : result.error().value()) << '\n';
 }
 }
@@ -126,7 +126,7 @@ int main() {
         c::MessageInterpreter interpreter;
         interpreter.addAuthorityInterpretedMessageCallback([](c::Message message) { record(message, 0); });
         interpreter.addObedientInterpretedMessageCallback(record);
-        auto interpret = [&](std::span<const std::byte> bytes) {
+        auto interpret = [&](lightnerx::compact::span<const std::byte> bytes) {
             mix(++calls);
             interpreter.authorityInterpret(bytes);
             mix(++calls);
@@ -136,7 +136,7 @@ int main() {
         };
         for (auto frame : frames) {
             for (std::size_t length = 0; length <= frame.size(); ++length)
-                interpret(std::span{frame}.first(length));
+                interpret(lightnerx::compact::span{frame}.first(length));
             frame.push_back(std::byte{});
             interpret(frame);
         }

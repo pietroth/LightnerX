@@ -1,9 +1,8 @@
-cmake_minimum_required(VERSION 4.2)
-
+cmake_minimum_required(VERSION 4.5.0)
 
 project(LightnerX LANGUAGES C CXX)
 
-set(CMAKE_CXX_STANDARD 26)
+set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
@@ -15,16 +14,21 @@ set(BUILD_EXAMPLES OFF CACHE BOOL "Build GameNetworkingSockets examples")
 add_subdirectory(external/GameNetworkingSockets)
 
 add_library(LightnerX STATIC)
-target_compile_features(LightnerX PUBLIC cxx_std_26)
+target_compile_features(LightnerX PUBLIC cxx_std_17)
+target_sources(LightnerX PUBLIC FILE_SET HEADERS BASE_DIRS "${PROJECT_SOURCE_DIR}/include"
+    FILES include/lightnerx/compact/span.hpp include/lightnerx/compact/expected.hpp)
 
 set(LIGHTNERX_SANITIZERS "" CACHE STRING "Sanitizers for LightnerX and consumers, e.g. address or address,undefined")
 if(LIGHTNERX_SANITIZERS)
     if(NOT CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
         message(FATAL_ERROR "LIGHTNERX_SANITIZERS requires GCC or Clang")
     endif()
-    # Instrument this library and its consumers without changing the compiler's
-    # std module or the compilation settings of third-party dependencies.
+    # Instrument the library and consumers without changing third-party sources.
     target_compile_options(LightnerX PUBLIC "-fsanitize=${LIGHTNERX_SANITIZERS}" -fno-omit-frame-pointer -fno-sanitize-recover=all)
+    # GameNetworkingSockets disables RTTI; its virtual interfaces cannot use vptr checks.
+    if(LIGHTNERX_SANITIZERS MATCHES "undefined")
+        target_compile_options(LightnerX PUBLIC -fno-sanitize=vptr)
+    endif()
     target_link_options(LightnerX PUBLIC "-fsanitize=${LIGHTNERX_SANITIZERS}")
 endif()
 

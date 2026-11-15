@@ -46,7 +46,8 @@ namespace lightnerx::network {
 
         int getOnlineCount() const noexcept;
 
-        void forEach(const auto& callback) const {
+        template<class Callback>
+        void forEach(const Callback& callback) const {
             // Reload by index after each callback: add/remove may reallocate clients.
             // The entry-time bound prevents additions from extending this traversal.
             const size_t limit = clients.size();

@@ -9,9 +9,9 @@
 #include <cstdint>
 #include <deque>
 #include <exception>
-#include <expected>
+#include <lightnerx/compact/expected.hpp>
 #include <functional>
-#include <span>
+#include <lightnerx/compact/span.hpp>
 #include <system_error>
 
 #include <lightnerx/network/network_manager.hpp>
@@ -44,7 +44,7 @@ namespace lightnerx::network {
         using ClientDisconnectedCallback = std::function<void(HSteamNetConnection)>;
         std::deque<ClientDisconnectedCallback> clientDisconnectedCallbacks;
 
-        using ClientReceivedMessageCallback = std::function<void(std::span<const std::byte>, HSteamNetConnection)>;
+        using ClientReceivedMessageCallback = std::function<void(lightnerx::compact::span<const std::byte>, HSteamNetConnection)>;
         std::deque<ClientReceivedMessageCallback> clientReceivedMessageCallbacks;
 
     public:
@@ -61,11 +61,11 @@ namespace lightnerx::network {
 
         void addClientReceivedMessageCallback(ClientReceivedMessageCallback callback);
 
-        std::expected<void, std::error_code> start(int port, uint32_t timeoutConnected);
+        lightnerx::compact::expected<void, std::error_code> start(int port, uint32_t timeoutConnected);
 
-        std::expected<void, std::error_code> update();
+        lightnerx::compact::expected<void, std::error_code> update();
 
-        std::expected<void, std::error_code> disconnectConnection(
+        lightnerx::compact::expected<void, std::error_code> disconnectConnection(
             HSteamNetConnection hConn, bool enableLinger
         );
 

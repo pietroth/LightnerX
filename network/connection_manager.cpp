@@ -46,7 +46,7 @@ std::optional<uint16_t> ConnectionManager::add(HSteamNetConnection hConn) {
         return {};
     }
 
-    if (onlineCount >= maxCapacity || hConn == invalidConnection || clientIds.contains(hConn)) {
+    if (onlineCount >= maxCapacity || hConn == invalidConnection || clientIds.find(hConn) != clientIds.end()) {
         return {};
     }
 

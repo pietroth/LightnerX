@@ -5,6 +5,7 @@ at specific failure boundaries. No production testing API or third-party edits.
 """
 import argparse
 from pathlib import Path
+import shlex
 import subprocess
 import tempfile
 from source_support import body
@@ -12,13 +13,36 @@ from source_support import body
 parser = argparse.ArgumentParser()
 parser.add_argument('--compiler', default='c++')
 parser.add_argument('--library', type=Path, required=True)
+parser.add_argument('--flags', default='')
 parser.add_argument('--sanitize', action='store_true')
 parser.add_argument('--baseline', action='store_true')
 args = parser.parse_args()
 root = Path(__file__).resolve().parents[1]
 
 source = r'''
-#include <bits/stdc++.h>
+#include <algorithm>
+#include <array>
+#include <cstddef>
+#include <cstdint>
+#include <cstdio>
+#include <cstring>
+#include <deque>
+#include <exception>
+#include <functional>
+#include <iostream>
+#include <limits>
+#include <memory>
+#include <new>
+#include <optional>
+#include <stdexcept>
+#include <string>
+#include <string_view>
+#include <system_error>
+#include <utility>
+#include <variant>
+#include <vector>
+#include <lightnerx/compact/span.hpp>
+#include <lightnerx/compact/expected.hpp>
 #include <steam/steamnetworkingsockets.h>
 #include <steam/isteamnetworkingutils.h>
 int liveMessages = 0, clientReceive = 0, serverReceive = 0;
@@ -34,7 +58,7 @@ SteamNetworkingMessage_t* trackedMessage(HSteamNetConnection handle) {
     message->m_conn = handle;
     message->m_pfnRelease = [](auto* value) {
         delete[] static_cast<std::byte*>(value->m_pData);
-        std::erase(allocatedMessages, value);
+        allocatedMessages.erase(std::remove(allocatedMessages.begin(), allocatedMessages.end(), value), allocatedMessages.end());
         delete static_cast<TrackedMessage*>(value);
         --liveMessages;
     };
@@ -63,6 +87,8 @@ void runServerCallbacks() {
 }
 EResult acceptConnection(HSteamNetConnection) { return k_EResultOK; }
 '''
+if args.baseline:
+    source = '#include <span>\n#include <expected>\n' + source
 for name in ['network_manager', 'client', 'server']:
     if args.baseline:
         path = 'network/' + name + '.cppm'
@@ -213,8 +239,8 @@ with tempfile.TemporaryDirectory(prefix='lightnerx-lifecycle-') as directory:
     cpp = Path(directory) / 'lifecycle.cpp'
     executable = Path(directory) / 'lifecycle'
     cpp.write_text(source)
-    command = [args.compiler, '-std=c++26', '-g', '-O1',
-               '-I' + str(root / 'external/GameNetworkingSockets/include'), str(cpp),
+    command = [args.compiler, '-std=c++26' if args.baseline else '-std=c++17', *shlex.split(args.flags), '-g', '-O1',
+               '-I' + str(root / 'include'), '-I' + str(root / 'external/GameNetworkingSockets/include'), str(cpp),
                str(args.library.resolve()), '-Wl,-rpath,' + str(args.library.resolve().parent), '-o', str(executable)]
     if args.sanitize:
         # The pinned GNS build uses -fno-rtti. UBSan vptr diagnoses even the

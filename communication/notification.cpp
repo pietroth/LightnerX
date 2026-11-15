@@ -17,7 +17,7 @@ void NotificationRegistry::registerIds(std::unordered_set<std::uint16_t>&& newId
 }
 
 bool NotificationRegistry::exist(std::uint16_t id) const noexcept {
-    return ids.contains(id);
+    return ids.find(id) != ids.end();
 }
 
 }

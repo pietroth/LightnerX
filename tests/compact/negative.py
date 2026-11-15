@@ -1,12 +1,14 @@
 """Require invalid span/expected programs to fail after a positive control builds."""
 import argparse
 import pathlib
+import shlex
 import subprocess
 import tempfile
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--compiler', required=True)
 parser.add_argument('--include', required=True)
+parser.add_argument('--flags', default='')
 parser.add_argument('--native', action='store_true')
 args = parser.parse_args()
 headers = ('#include <span>\n#include <expected>\nnamespace c = std;\n' if args.native else
@@ -31,7 +33,7 @@ with tempfile.TemporaryDirectory(prefix='lightnerx-compile-contract-') as direct
     def compile_case(body):
         source.write_text(headers + 'int main() { ' + body + ' }\n')
         return subprocess.run([args.compiler, '-std=c++23' if args.native else '-std=c++17',
-                               '-pedantic-errors', '-fsyntax-only', '-I' + args.include, str(source)],
+                               *shlex.split(args.flags), '-pedantic-errors', '-fsyntax-only', '-I' + args.include, str(source)],
                               capture_output=True, text=True, timeout=30)
     control = compile_case('int a[2]{}; c::span<int> s(a); c::expected<int,int> e(4); return s[0] + *e;')
     if control.returncode:

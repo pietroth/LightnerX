@@ -23,12 +23,6 @@ compile_commands.json
 .ninja_log
 build.ninja
 
-# C++ Modules generated artifacts
-*.gcm
-*.pcm
-*.ifc
-*.modmap
-
 # IDE
 .idea/
 .vscode/

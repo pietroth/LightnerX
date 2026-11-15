@@ -34,7 +34,7 @@ struct ISteamNetworkingSockets {
     std::unordered_map<uint32_t, int64_t> userdata;
     bool GetConnectionInfo(uint32_t handle, SteamNetConnectionInfo_t*) { return handle > 0; }
     bool SetConnectionUserData(uint32_t handle, int64_t id) { userdata[handle] = id; return handle > 0; }
-    int64_t GetConnectionUserData(uint32_t handle) { return userdata.contains(handle) ? userdata[handle] : -1; }
+    int64_t GetConnectionUserData(uint32_t handle) { return userdata.find(handle) != userdata.end() ? userdata[handle] : -1; }
 };
 ISteamNetworkingSockets sockets;
 ISteamNetworkingSockets* SteamNetworkingSockets() { return &sockets; }
@@ -84,5 +84,5 @@ with tempfile.TemporaryDirectory(prefix="lightnerx-id-domain-") as directory:
     cpp = Path(directory) / "domain.cpp"
     executable = Path(directory) / "domain"
     cpp.write_text(preamble + source + test)
-    subprocess.run([args.compiler, "-std=c++26", *shlex.split(args.flags), "-fno-sanitize-recover=all", str(cpp), "-o", str(executable)], check=True)
+    subprocess.run([args.compiler, "-std=c++17", *shlex.split(args.flags), "-fno-sanitize-recover=all", str(cpp), "-o", str(executable)], check=True)
     subprocess.run([str(executable)], check=True, timeout=30)

@@ -5,8 +5,8 @@
 #include "steam/steamclientpublic.h"
 #include "steam/steamnetworkingtypes.h"
 #include <cstddef>
-#include <expected>
-#include <span>
+#include <lightnerx/compact/expected.hpp>
+#include <lightnerx/compact/span.hpp>
 #include <system_error>
 #include <vector>
 
@@ -14,18 +14,18 @@
 #include <lightnerx/network/network_manager.hpp>
 
 namespace lightnerx::network {
-    std::expected<void, std::error_code> sendToConnection(
-        const std::span<const std::byte> message,
+    lightnerx::compact::expected<void, std::error_code> sendToConnection(
+        const lightnerx::compact::span<const std::byte> message,
         const HSteamNetConnection hConn
     );
 
-    std::expected<void, std::error_code> sendToConnections(
-        const std::span<const std::byte> message,
+    lightnerx::compact::expected<void, std::error_code> sendToConnections(
+        const lightnerx::compact::span<const std::byte> message,
         const std::vector<HSteamNetConnection> connections
     );
 
-    std::expected<void, std::error_code> broadcast(
-        const std::span<const std::byte> message,
+    lightnerx::compact::expected<void, std::error_code> broadcast(
+        const lightnerx::compact::span<const std::byte> message,
         const lightnerx::network::ConnectionManager& connectionManager,
         const std::vector<HSteamNetConnection> exceptions
     );

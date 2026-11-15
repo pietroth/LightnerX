@@ -7,9 +7,9 @@
 #include <steam/isteamnetworkingutils.h>
 #include <cstddef>
 #include <deque>
-#include <expected>
+#include <lightnerx/compact/expected.hpp>
 #include <functional>
-#include <span>
+#include <lightnerx/compact/span.hpp>
 #include <string_view>
 #include <system_error>
 
@@ -21,7 +21,7 @@ namespace lightnerx::network {
         bool connected = false;
         bool updating = false;
 
-        using ServerReceivedMessageCallback = std::function<void(std::span<const std::byte>)>;
+        using ServerReceivedMessageCallback = std::function<void(lightnerx::compact::span<const std::byte>)>;
         std::deque<ServerReceivedMessageCallback> serverReceivedMessageCallbacks;
 
         ISteamNetworkingSockets* m_sockets = nullptr;
@@ -40,13 +40,13 @@ namespace lightnerx::network {
 
         void addServerReceivedMessageCallback(const ServerReceivedMessageCallback& callback);
 
-        std::expected<void, std::error_code> start();
+        lightnerx::compact::expected<void, std::error_code> start();
 
-        std::expected<void, std::error_code> connect(std::string_view ip, int port);
+        lightnerx::compact::expected<void, std::error_code> connect(std::string_view ip, int port);
 
-        std::expected<void, std::error_code> update(int maxMessagesToProcess);
+        lightnerx::compact::expected<void, std::error_code> update(int maxMessagesToProcess);
 
-        std::expected<void, std::error_code> disconnect(bool enableLinger);
+        lightnerx::compact::expected<void, std::error_code> disconnect(bool enableLinger);
 
         bool isConnected() const noexcept;
 

@@ -1,8 +1,8 @@
 #include <lightnerx/network/message_batch.hpp>
 
 #include <cstddef>
-#include <expected>
-#include <span>
+#include <lightnerx/compact/expected.hpp>
+#include <lightnerx/compact/span.hpp>
 #include <stdexcept>
 #include <system_error>
 #include <utility>
@@ -39,24 +39,24 @@ namespace lightnerx::network {
         pending.messages.reserve(static_cast<std::size_t>(capacity));
     }
 
-    std::expected<void, std::error_code> queueMessage(
+    lightnerx::compact::expected<void, std::error_code> queueMessage(
         OutboundMessage message
     ) {
         detail::setNetworkCleanup(&clearMessagesBatcher);
         if (message.message == nullptr) {
-            return std::unexpected(std::make_error_code(std::errc::invalid_argument));
+            return lightnerx::compact::unexpected(std::make_error_code(std::errc::invalid_argument));
         }
 
         if (pending.messages.size() >= pending.messages.capacity()) {
             message.message->Release();
-            return std::unexpected(std::make_error_code(std::errc::not_enough_memory));
+            return lightnerx::compact::unexpected(std::make_error_code(std::errc::not_enough_memory));
         }
 
         pending.messages.push_back(std::move(message));
         return {};
     }
 
-    std::expected<void, std::error_code> flushAll(
+    lightnerx::compact::expected<void, std::error_code> flushAll(
         const ConnectionManager& connectionManager
     ) {
         struct ReleasePending {
@@ -65,12 +65,12 @@ namespace lightnerx::network {
         std::error_code lastError;
 
         for (auto& message : pending.messages) {
-            std::span<const std::byte> data{
+            lightnerx::compact::span<const std::byte> data{
                 static_cast<const std::byte*>(message.message->m_pData),
                 static_cast<size_t>(message.message->m_cbSize)
             };
 
-            std::expected<void, std::error_code> result;
+            lightnerx::compact::expected<void, std::error_code> result;
 
             if (message.target.isSingle()) {
                 result = lightnerx::network::sendToConnection(
@@ -98,7 +98,7 @@ namespace lightnerx::network {
         }
 
         if (lastError) {
-            return std::unexpected(lastError);
+            return lightnerx::compact::unexpected(lastError);
         }
 
         return {};

@@ -22,8 +22,7 @@ set_tests_properties(lightnerx.characterization PROPERTIES TIMEOUT 60)
 
 set(domain_test_flags "${CMAKE_CXX_FLAGS}")
 if(LIGHTNERX_SANITIZERS)
-    # These supplemental tests compile implementation bodies without modules;
-    # they can run both sanitizers even on GCC versions with a UBSan/modules ICE.
+    # Fault injection uses the same implementation with deterministic transport stubs.
     string(APPEND domain_test_flags " -fsanitize=address,undefined -fno-omit-frame-pointer")
 endif()
 add_test(NAME lightnerx.connection_manager_domain
@@ -38,13 +37,13 @@ if(LIGHTNERX_SANITIZERS OR CMAKE_CXX_FLAGS MATCHES "fsanitize=")
 endif()
 add_test(NAME lightnerx.message_faults
     COMMAND ${Python3_EXECUTABLE} "${CMAKE_CURRENT_SOURCE_DIR}/message_faults.py"
-        --compiler "${CMAKE_CXX_COMPILER}" ${message_fault_options}
+        --compiler "${CMAKE_CXX_COMPILER}" "--flags=${CMAKE_CXX_FLAGS}" ${message_fault_options}
 )
 set_tests_properties(lightnerx.message_faults PROPERTIES TIMEOUT 180)
 
 add_test(NAME lightnerx.lifecycle_faults
     COMMAND ${Python3_EXECUTABLE} "${CMAKE_CURRENT_SOURCE_DIR}/lifecycle_faults.py"
-        --compiler "${CMAKE_CXX_COMPILER}" --library "$<TARGET_FILE:GameNetworkingSockets>"
+        --compiler "${CMAKE_CXX_COMPILER}" "--flags=${CMAKE_CXX_FLAGS}" --library "$<TARGET_FILE:GameNetworkingSockets>"
         ${message_fault_options}
 )
 set_tests_properties(lightnerx.lifecycle_faults PROPERTIES TIMEOUT 180)
@@ -67,7 +66,9 @@ add_test(NAME lightnerx.consumer
             "-DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}"
             "-DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER}"
             "-DCMAKE_MAKE_PROGRAM=${CMAKE_MAKE_PROGRAM}"
+            "-DCMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}"
             "-DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}"
+            "-DCMAKE_C_FLAGS=${CMAKE_C_FLAGS}"
             "-DCMAKE_CXX_FLAGS=${CMAKE_CXX_FLAGS}"
             "-DCMAKE_EXE_LINKER_FLAGS=${CMAKE_EXE_LINKER_FLAGS}"
             "-DCMAKE_SHARED_LINKER_FLAGS=${CMAKE_SHARED_LINKER_FLAGS}"
