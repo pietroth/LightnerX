@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 4.2)
+cmake_minimum_required(VERSION 4.5.0)
 set(CMAKE_CXX_EXTENSIONS OFF)
 project(LightnerXConsumer LANGUAGES C CXX)
 
@@ -8,5 +8,5 @@ endif()
 set(LIGHTNERX_BUILD_TESTS OFF CACHE BOOL "" FORCE)
 add_subdirectory("${LIGHTNERX_SOURCE_DIR}" lightnerx)
 add_executable(lightnerx_consumer main.cpp producer.cpp)
-# C++26, Steam headers and linking must all propagate through this target.
+# C++17, Steam headers and linking must all propagate through this target.
 target_link_libraries(lightnerx_consumer PRIVATE LightnerX)

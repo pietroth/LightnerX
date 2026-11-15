@@ -7,7 +7,7 @@
 #include <cstdint>
 #include <deque>
 #include <functional>
-#include <span>
+#include <lightnerx/compact/span.hpp>
 #include <variant>
 
 #include <lightnerx/network/message_batch.hpp>
@@ -27,7 +27,7 @@ namespace lightnerx::communication {
             lightnerx::communication::UnsuccessfulResponse,
             lightnerx::communication::Notification
         > header;
-        std::span<const std::byte> payload;
+        lightnerx::compact::span<const std::byte> payload;
     };
 
     class MessageInterpreter {
@@ -44,13 +44,13 @@ namespace lightnerx::communication {
         void addObedientInterpretedMessageCallback(ObedientInterpretedMessageCallback callback);
 
         void obedientInterpret(
-            const std::span<const std::byte> data,
+            const lightnerx::compact::span<const std::byte> data,
             const lightnerx::communication::NotificationRegistry& registry,
             HSteamNetConnection hConn,
             const lightnerx::network::ConnectionManager& connManager
         );
 
-        void authorityInterpret(const std::span<const std::byte> data);
+        void authorityInterpret(const lightnerx::compact::span<const std::byte> data);
 
     private:
         void callAuthorityInterpretedCallbacks(Message message);
@@ -60,31 +60,31 @@ namespace lightnerx::communication {
 
     lightnerx::network::OutboundMessage event2OutboundMessage(
         const lightnerx::communication::Event& event,
-        const std::span<const std::byte> payload,
+        const lightnerx::compact::span<const std::byte> payload,
         lightnerx::network::Target target
     );
 
     lightnerx::network::OutboundMessage intention2OutboundMessage(
         const lightnerx::communication::Intention& intention,
-        const std::span<const std::byte> payload,
+        const lightnerx::compact::span<const std::byte> payload,
         lightnerx::network::Target target
     );
 
     lightnerx::network::OutboundMessage response2OutboundMessage(
         const lightnerx::communication::Response& response,
-        const std::span<const std::byte> payload,
+        const lightnerx::compact::span<const std::byte> payload,
         lightnerx::network::Target target
     );
 
     lightnerx::network::OutboundMessage unsuccessfulResponse2OutboundMessage(
         const lightnerx::communication::UnsuccessfulResponse& response,
-        const std::span<const std::byte> payload,
+        const lightnerx::compact::span<const std::byte> payload,
         lightnerx::network::Target target
     );
 
     lightnerx::network::OutboundMessage notification2OutboundMessage(
         const lightnerx::communication::Notification& notification,
-        const std::span<const std::byte> payload,
+        const lightnerx::compact::span<const std::byte> payload,
         lightnerx::network::Target target
     );
 }

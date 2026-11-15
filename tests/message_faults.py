@@ -6,19 +6,43 @@ The normal CMake messages target independently tests the real library and GNS.
 """
 import argparse
 import pathlib
+import shlex
 import subprocess
 import tempfile
 from source_support import body
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--compiler', default='g++')
+parser.add_argument('--flags', default='')
 parser.add_argument('--sanitize', action='store_true')
 args = parser.parse_args()
 root = pathlib.Path(__file__).resolve().parent.parent
 
 source = r'''
 #define LIGHTNERX_SOURCE_TEST
-#include <bits/stdc++.h>
+#include <algorithm>
+#include <array>
+#include <cstddef>
+#include <cstdint>
+#include <cstdio>
+#include <cstring>
+#include <deque>
+#include <exception>
+#include <functional>
+#include <iostream>
+#include <limits>
+#include <memory>
+#include <new>
+#include <optional>
+#include <stdexcept>
+#include <string>
+#include <string_view>
+#include <system_error>
+#include <utility>
+#include <variant>
+#include <vector>
+#include <lightnerx/compact/span.hpp>
+#include <lightnerx/compact/expected.hpp>
 #include <steam/isteamnetworkingutils.h>
 bool failAllocation = false, throwSend = false;
 int liveMessages = 0;
@@ -51,14 +75,14 @@ namespace lightnerx::network {
         }
     };
     namespace detail { void setNetworkCleanup(void (*hook)() noexcept) { cleanupHook = hook; } }
-    std::expected<void, std::error_code> sendToConnection(std::span<const std::byte>, HSteamNetConnection) {
+    lightnerx::compact::expected<void, std::error_code> sendToConnection(lightnerx::compact::span<const std::byte>, HSteamNetConnection) {
         if (throwSend && sendsBeforeThrow-- == 0) throw 23;
-        return std::unexpected(std::make_error_code(std::errc::io_error));
+        return lightnerx::compact::unexpected(std::make_error_code(std::errc::io_error));
     }
-    std::expected<void, std::error_code> sendToConnections(std::span<const std::byte> data, std::vector<HSteamNetConnection>) {
+    lightnerx::compact::expected<void, std::error_code> sendToConnections(lightnerx::compact::span<const std::byte> data, std::vector<HSteamNetConnection>) {
         return sendToConnection(data, 0);
     }
-    std::expected<void, std::error_code> broadcast(std::span<const std::byte> data, const ConnectionManager&, std::vector<HSteamNetConnection>) {
+    lightnerx::compact::expected<void, std::error_code> broadcast(lightnerx::compact::span<const std::byte> data, const ConnectionManager&, std::vector<HSteamNetConnection>) {
         return sendToConnection(data, 0);
     }
 }
@@ -73,8 +97,8 @@ with tempfile.TemporaryDirectory(prefix='lightnerx-message-test-') as directory:
     cpp = pathlib.Path(directory) / 'messages.cpp'
     binary = pathlib.Path(directory) / 'messages'
     cpp.write_text(source)
-    command = [args.compiler, '-std=c++26', '-g', '-O1',
-               '-I' + str(root / 'external/GameNetworkingSockets/include'), str(cpp), '-o', str(binary)]
+    command = [args.compiler, '-std=c++17', *shlex.split(args.flags), '-g', '-O1',
+               '-I' + str(root / 'include'), '-I' + str(root / 'external/GameNetworkingSockets/include'), str(cpp), '-o', str(binary)]
     if args.sanitize:
         command += ['-fsanitize=address,undefined', '-fno-omit-frame-pointer', '-fno-sanitize-recover=all']
     subprocess.run(command, check=True)

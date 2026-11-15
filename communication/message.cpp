@@ -6,7 +6,7 @@
 #include <limits>
 #include <new>
 #include <optional>
-#include <span>
+#include <lightnerx/compact/span.hpp>
 #include <stdexcept>
 #include <utility>
 
@@ -34,7 +34,7 @@ void MessageInterpreter::addObedientInterpretedMessageCallback(ObedientInterpret
 }
 
 void MessageInterpreter::obedientInterpret(
-            const std::span<const std::byte> data,
+            const lightnerx::compact::span<const std::byte> data,
             const lightnerx::communication::NotificationRegistry& registry,
             HSteamNetConnection hConn,
             const lightnerx::network::ConnectionManager& connManager
@@ -84,7 +84,7 @@ void MessageInterpreter::obedientInterpret(
     }
 }
 
-void MessageInterpreter::authorityInterpret(const std::span<const std::byte> data) {
+void MessageInterpreter::authorityInterpret(const lightnerx::compact::span<const std::byte> data) {
     if (data.size_bytes() < 4) {
         return;
     }
@@ -169,7 +169,7 @@ void MessageInterpreter::callObedientInterpretedCallbacks(Message message, uint1
 
 lightnerx::network::OutboundMessage event2OutboundMessage(
         const lightnerx::communication::Event& event,
-        const std::span<const std::byte> payload,
+        const lightnerx::compact::span<const std::byte> payload,
         lightnerx::network::Target target
     ) {
     auto* message = detail::allocateMessage(sizeof(event), payload.size());
@@ -185,7 +185,7 @@ lightnerx::network::OutboundMessage event2OutboundMessage(
 
 lightnerx::network::OutboundMessage intention2OutboundMessage(
         const lightnerx::communication::Intention& intention,
-        const std::span<const std::byte> payload,
+        const lightnerx::compact::span<const std::byte> payload,
         lightnerx::network::Target target
     ) {
     auto* message = detail::allocateMessage(sizeof(intention), payload.size());
@@ -201,7 +201,7 @@ lightnerx::network::OutboundMessage intention2OutboundMessage(
 
 lightnerx::network::OutboundMessage response2OutboundMessage(
         const lightnerx::communication::Response& response,
-        const std::span<const std::byte> payload,
+        const lightnerx::compact::span<const std::byte> payload,
         lightnerx::network::Target target
     ) {
     auto* message = detail::allocateMessage(sizeof(response), payload.size());
@@ -217,7 +217,7 @@ lightnerx::network::OutboundMessage response2OutboundMessage(
 
 lightnerx::network::OutboundMessage unsuccessfulResponse2OutboundMessage(
         const lightnerx::communication::UnsuccessfulResponse& response,
-        const std::span<const std::byte> payload,
+        const lightnerx::compact::span<const std::byte> payload,
         lightnerx::network::Target target
     ) {
     auto* message = detail::allocateMessage(sizeof(response), payload.size());
@@ -233,7 +233,7 @@ lightnerx::network::OutboundMessage unsuccessfulResponse2OutboundMessage(
 
 lightnerx::network::OutboundMessage notification2OutboundMessage(
         const lightnerx::communication::Notification& notification,
-        const std::span<const std::byte> payload,
+        const lightnerx::compact::span<const std::byte> payload,
         lightnerx::network::Target target
     ) {
     auto* message = detail::allocateMessage(sizeof(notification), payload.size());

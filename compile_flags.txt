@@ -1,2 +1,4 @@
--std=c++26
+-std=c++17
 -Wall
+-Iinclude
+-Iexternal/GameNetworkingSockets/include

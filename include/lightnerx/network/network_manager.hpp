@@ -2,7 +2,7 @@
 #define LIGHTNERX_NETWORK_NETWORK_MANAGER_HPP
 
 #include <steam/steamnetworkingsockets.h>
-#include <expected>
+#include <lightnerx/compact/expected.hpp>
 #include <system_error>
 
 
@@ -14,7 +14,7 @@ namespace lightnerx::network {
     bool isNetworkInitialized();
     namespace detail {
         void setNetworkCleanup(void (*cleanup)() noexcept) noexcept;
-        std::expected<void, std::error_code> acquireNetworkOwner(const void* owner);
+        lightnerx::compact::expected<void, std::error_code> acquireNetworkOwner(const void* owner);
         void releaseNetworkOwner(const void* owner) noexcept;
     }
 }

@@ -6,8 +6,7 @@
 #include <cstddef>
 #include <exception>
 #include <iostream>
-#include <print>
-#include <span>
+#include <lightnerx/compact/span.hpp>
 #include <stdexcept>
 #include <string>
 #include <string_view>
@@ -63,7 +62,7 @@ void smoke() {
     check(server.start(-1, 1000).error() == std::errc::invalid_argument, "invalid port");
     check(server.start(0, 1000).error() == std::errc::invalid_argument, "GNS requires an explicit listen port");
     check(!isNetworkInitialized(), "argument rejection preserves network state");
-    std::println("Lifecycle and ownership regressions passed");
+    std::cout << "Lifecycle and ownership regressions passed" << '\n';
 }
 
 void runServer(int port) {
@@ -85,7 +84,7 @@ void runServer(int port) {
         connections.remove(*id);
         if (++disconnected == 3) server.close();
     });
-    server.addClientReceivedMessageCallback([&](std::span<const std::byte> data, auto handle) {
+    server.addClientReceivedMessageCallback([&](lightnerx::compact::span<const std::byte> data, auto handle) {
         check(server.update().error() == std::errc::operation_in_progress, "recursive server update");
         check(data.size() == 1 && (data[0] == std::byte{0x61} || data[0] == std::byte{0x62}), "server received payload");
         if (++received == 1) server.addClientReceivedMessageCallback([&](auto, auto) { ++addedReceiveCalls; });
@@ -119,13 +118,13 @@ void runServer(int port) {
     server.close();
     server.close();
     check(!isNetworkInitialized(), "server repeated close");
-    std::println("Server integration passed");
+    std::cout << "Server integration passed" << '\n';
 }
 
 void runClient(int port) {
     Client client;
     int received = 0, addedCalls = 0;
-    client.addServerReceivedMessageCallback([&](std::span<const std::byte> data) {
+    client.addServerReceivedMessageCallback([&](lightnerx::compact::span<const std::byte> data) {
         check(client.update(1).error() == std::errc::operation_in_progress, "recursive client update");
         check(data.size() == 1 && data[0] == std::byte{0x61}, "client received payload");
         if (++received == 1) client.addServerReceivedMessageCallback([&](auto) { ++addedCalls; });
@@ -164,7 +163,7 @@ void runClient(int port) {
         std::this_thread::sleep_for(1ms);
     }
     check(sent && !client.isConnected() && !client.getServerHConn(), "remote disconnect resets client state");
-    std::println("Client integration passed");
+    std::cout << "Client integration passed" << '\n';
 }
 
 int main(int argc, char** argv) {
@@ -173,7 +172,7 @@ int main(int argc, char** argv) {
         else if (argc == 3 && std::string_view(argv[1]) == "--client") runClient(std::stoi(argv[2]));
         else smoke();
     } catch (const std::exception& error) {
-        std::println(std::cerr, "{}", error.what());
+        std::cerr << error.what() << '\n';
         return 1;
     }
 }

@@ -1,6 +1,6 @@
 #include <lightnerx/network/network_manager.hpp>
 
-#include <expected>
+#include <lightnerx/compact/expected.hpp>
 #include <system_error>
 
 namespace lightnerx::network::detail {
@@ -43,12 +43,12 @@ namespace lightnerx::network {
             networkCleanup = cleanup;
         }
 
-        std::expected<void, std::error_code> acquireNetworkOwner(const void* owner) {
+        lightnerx::compact::expected<void, std::error_code> acquireNetworkOwner(const void* owner) {
             if (networkOwner) {
-                return std::unexpected(std::make_error_code(std::errc::device_or_resource_busy));
+                return lightnerx::compact::unexpected(std::make_error_code(std::errc::device_or_resource_busy));
             }
             if (!networkInit()) {
-                return std::unexpected(std::make_error_code(std::errc::io_error));
+                return lightnerx::compact::unexpected(std::make_error_code(std::errc::io_error));
             }
             networkOwner = owner;
             return {};

@@ -1,8 +1,4 @@
 CompileFlags:
   Compiler: clang++
-  Add: [-std=c++26]
-  Remove:
-    - -std=c++*
-    - -fdeps-format=*
-    - -fmodule-mapper=*
-    - -fmodules-ts
+  Add: [-std=c++17]
+  Remove: [-std=c++*]

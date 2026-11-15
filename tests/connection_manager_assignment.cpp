@@ -11,8 +11,8 @@
 #include <iostream>
 #include <new>
 #include <optional>
-#include <print>
-#include <span>
+#include <iostream>
+#include <lightnerx/compact/span.hpp>
 #include <stdexcept>
 #include <type_traits>
 #include <utility>
@@ -56,7 +56,7 @@ void check(bool condition, const char* description) {
 }
 
 void verifyMappings(const ConnectionManager& manager,
-                    std::span<const HSteamNetConnection> handles,
+                    lightnerx::compact::span<const HSteamNetConnection> handles,
                     std::initializer_list<Registration> expected) {
     check(manager.getOnlineCount() == static_cast<int>(expected.size()), "registration count changed");
     for (std::uint16_t id = 0; id <= handles.size(); ++id) {
@@ -72,13 +72,13 @@ void verifyMappings(const ConnectionManager& manager,
     std::size_t visits = 0;
     manager.forEach([&](std::uint16_t id, HSteamNetConnection handle) {
         ++visits;
-        check(std::ranges::find(expected, Registration{id, handle}) != expected.end(),
+        check(std::find(expected.begin(), expected.end(), Registration{id, handle}) != expected.end(),
               "enumeration contains an unexpected registration");
     });
     check(visits == expected.size(), "enumeration count changed");
 }
 
-void assignmentRegression(std::span<const HSteamNetConnection> handles) {
+void assignmentRegression(lightnerx::compact::span<const HSteamNetConnection> handles) {
     ConnectionManager source(64, 6);
     for (std::uint16_t id = 1; id <= 4; ++id) {
         check(source.add(handles[id - 1]) == id, "source setup");
@@ -136,7 +136,7 @@ void assignmentRegression(std::span<const HSteamNetConnection> handles) {
         if (completed) break;
     }
     check(completed && failures > 0, "allocation failure sweep did not complete");
-    std::println("ConnectionManager assignment passed: {} allocation failures preserved state", failures);
+    std::cout << "ConnectionManager assignment passed: " << failures << " allocation failures preserved state" << '\n';
 }
 }
 
@@ -156,7 +156,7 @@ int main() {
         networkKill();
         return 0;
     } catch (const std::exception& error) {
-        std::println(std::cerr, "{}", error.what());
+        std::cerr << error.what() << '\n';
         networkKill();
         return 1;
     }

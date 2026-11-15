@@ -3,26 +3,26 @@
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
-#include <expected>
+#include <lightnerx/compact/expected.hpp>
 #include <optional>
-#include <span>
+#include <lightnerx/compact/span.hpp>
 #include <system_error>
 #include <vector>
 
 namespace lightnerx::network {
 
-std::expected<void, std::error_code> sendToConnection(
-        const std::span<const std::byte> message,
+lightnerx::compact::expected<void, std::error_code> sendToConnection(
+        const lightnerx::compact::span<const std::byte> message,
         const HSteamNetConnection hConn
     ) {
     if (!lightnerx::network::isNetworkInitialized()) {
-        return std::unexpected(std::make_error_code(std::errc::resource_unavailable_try_again));
+        return lightnerx::compact::unexpected(std::make_error_code(std::errc::resource_unavailable_try_again));
     }
 
     ISteamNetworkingSockets* pInterface = SteamNetworkingSockets();
 
     if (!pInterface || hConn == k_invalidConnection) {
-        return std::unexpected(
+        return lightnerx::compact::unexpected(
             std::make_error_code(std::errc::not_connected)
         );
     }
@@ -39,13 +39,13 @@ std::expected<void, std::error_code> sendToConnection(
         return {};
     }
 
-    return std::unexpected(
+    return lightnerx::compact::unexpected(
         std::make_error_code(std::errc::io_error)
     );
 }
 
-std::expected<void, std::error_code> sendToConnections(
-        const std::span<const std::byte> message,
+lightnerx::compact::expected<void, std::error_code> sendToConnections(
+        const lightnerx::compact::span<const std::byte> message,
         const std::vector<HSteamNetConnection> connections
     ) {
     std::optional<std::error_code> error;
@@ -59,21 +59,21 @@ std::expected<void, std::error_code> sendToConnections(
     }
 
     if (error) {
-        return std::unexpected(*error);
+        return lightnerx::compact::unexpected(*error);
     }
 
     return {};
 }
 
-std::expected<void, std::error_code> broadcast(
-        const std::span<const std::byte> message,
+lightnerx::compact::expected<void, std::error_code> broadcast(
+        const lightnerx::compact::span<const std::byte> message,
         const lightnerx::network::ConnectionManager& connectionManager,
         const std::vector<HSteamNetConnection> exceptions
     ) {
     std::optional<std::error_code> error;
 
     connectionManager.forEach([&](uint16_t id, HSteamNetConnection hConn) {
-        if (std::ranges::contains(exceptions, hConn)) {
+        if (std::find(exceptions.begin(), exceptions.end(), hConn) != exceptions.end()) {
             return ;
         }
 
@@ -85,7 +85,7 @@ std::expected<void, std::error_code> broadcast(
     });
 
     if (error) {
-        return std::unexpected(*error);
+        return lightnerx::compact::unexpected(*error);
     }
 
     return {};

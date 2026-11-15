@@ -1,8 +1,8 @@
 #include <lightnerx/network/client.hpp>
 
 #include <cstddef>
-#include <expected>
-#include <span>
+#include <lightnerx/compact/expected.hpp>
+#include <lightnerx/compact/span.hpp>
 #include <string>
 #include <string_view>
 #include <system_error>
@@ -39,9 +39,9 @@ void Client::addServerReceivedMessageCallback(const ServerReceivedMessageCallbac
     serverReceivedMessageCallbacks.push_back(callback);
 }
 
-std::expected<void, std::error_code> Client::start() {
+lightnerx::compact::expected<void, std::error_code> Client::start() {
     if (m_sockets) {
-        return std::unexpected(
+        return lightnerx::compact::unexpected(
             std::make_error_code(std::errc::operation_in_progress)
         );
     }
@@ -53,7 +53,7 @@ std::expected<void, std::error_code> Client::start() {
     if (!m_sockets) {
         detail::releaseNetworkOwner(this);
 
-        return std::unexpected(
+        return lightnerx::compact::unexpected(
             std::make_error_code(std::errc::io_error)
         );
     }
@@ -63,17 +63,17 @@ std::expected<void, std::error_code> Client::start() {
     return {};
 }
 
-std::expected<void, std::error_code> Client::connect(std::string_view ip, int port) {
+lightnerx::compact::expected<void, std::error_code> Client::connect(std::string_view ip, int port) {
     if (!m_sockets) {
-        return std::unexpected(std::make_error_code(std::errc::not_connected));
+        return lightnerx::compact::unexpected(std::make_error_code(std::errc::not_connected));
     }
 
     if (m_connection != k_invalidConnection) {
-        return std::unexpected(std::make_error_code(std::errc::already_connected));
+        return lightnerx::compact::unexpected(std::make_error_code(std::errc::already_connected));
     }
 
     if (ip.empty() || port < 1 || port > 65535) {
-        return std::unexpected(std::make_error_code(std::errc::invalid_argument));
+        return lightnerx::compact::unexpected(std::make_error_code(std::errc::invalid_argument));
     }
 
     SteamNetworkingIPAddr address{};
@@ -81,7 +81,7 @@ std::expected<void, std::error_code> Client::connect(std::string_view ip, int po
     const std::string ip_string{ip};
 
     if (!address.ParseString(ip_string.c_str())) {
-        return std::unexpected(
+        return lightnerx::compact::unexpected(
             std::make_error_code(std::errc::invalid_argument)
         );
     }
@@ -102,7 +102,7 @@ std::expected<void, std::error_code> Client::connect(std::string_view ip, int po
     );
 
     if (m_connection == k_HSteamNetConnection_Invalid) {
-        return std::unexpected(
+        return lightnerx::compact::unexpected(
             std::make_error_code(std::errc::io_error)
         );
     }
@@ -110,13 +110,13 @@ std::expected<void, std::error_code> Client::connect(std::string_view ip, int po
     return {};
 }
 
-std::expected<void, std::error_code> Client::update(int maxMessagesToProcess) {
+lightnerx::compact::expected<void, std::error_code> Client::update(int maxMessagesToProcess) {
     if (!m_sockets) {
-        return std::unexpected(std::make_error_code(std::errc::not_connected));
+        return lightnerx::compact::unexpected(std::make_error_code(std::errc::not_connected));
     }
 
     if (updating) {
-        return std::unexpected(std::make_error_code(std::errc::operation_in_progress));
+        return lightnerx::compact::unexpected(std::make_error_code(std::errc::operation_in_progress));
     }
     updating = true;
     struct UpdateGuard {
@@ -155,7 +155,7 @@ std::expected<void, std::error_code> Client::update(int maxMessagesToProcess) {
         const auto connection = std::exchange(m_connection, k_invalidConnection);
         connected = false;
         m_sockets->CloseConnection(connection, 0, nullptr, false);
-        return std::unexpected(std::make_error_code(std::errc::io_error));
+        return lightnerx::compact::unexpected(std::make_error_code(std::errc::io_error));
     }
     if (count == 0) {
         return {};
@@ -165,7 +165,7 @@ std::expected<void, std::error_code> Client::update(int maxMessagesToProcess) {
     for (int i = 0; i < count && m_connection == receivingConnection; ++i) {
         SteamNetworkingMessage_t* message = messages[i];
 
-        std::span<const std::byte> convertedMessage{
+        lightnerx::compact::span<const std::byte> convertedMessage{
             static_cast<const std::byte*>(message->m_pData),
             static_cast<std::size_t>(message->m_cbSize)
         };
@@ -181,9 +181,9 @@ std::expected<void, std::error_code> Client::update(int maxMessagesToProcess) {
     return {};
 }
 
-std::expected<void, std::error_code> Client::disconnect(bool enableLinger) {
+lightnerx::compact::expected<void, std::error_code> Client::disconnect(bool enableLinger) {
     if (!m_sockets || m_connection == k_invalidConnection) {
-        return std::unexpected(
+        return lightnerx::compact::unexpected(
             std::make_error_code(std::errc::not_connected)
         );
     }
@@ -200,7 +200,7 @@ std::expected<void, std::error_code> Client::disconnect(bool enableLinger) {
         return {};
     }
 
-    return std::unexpected(std::make_error_code(std::errc::io_error));
+    return lightnerx::compact::unexpected(std::make_error_code(std::errc::io_error));
 }
 
 bool Client::isConnected() const noexcept {
