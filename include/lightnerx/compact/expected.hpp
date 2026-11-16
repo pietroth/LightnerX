@@ -574,6 +574,7 @@ public:
         if constexpr (!std::is_void_v<T>) return (this->data_.value);
     }
     constexpr lref<T> value() & {
+        static_assert(std::is_copy_constructible_v<E>, "value requires a copyable error");
         if (!has_value()) throw bad_expected_access<E>(static_cast<const E&>(this->data_.error));
         if constexpr (!std::is_void_v<T>) return (this->data_.value);
     }
@@ -610,6 +611,7 @@ public:
         if constexpr (!std::is_void_v<T>) return (this->data_.value);
     }
     constexpr lref<const T> value() const & {
+        static_assert(std::is_copy_constructible_v<E>, "value requires a copyable error");
         if (!has_value()) throw bad_expected_access<E>(static_cast<const E&>(this->data_.error));
         if constexpr (!std::is_void_v<T>) return (this->data_.value);
     }
@@ -646,6 +648,8 @@ public:
         if constexpr (!std::is_void_v<T>) return std::move(this->data_.value);
     }
     constexpr rref<T> value() && {
+        static_assert(std::is_copy_constructible_v<E> && std::is_move_constructible_v<E>,
+                      "value requires a copyable and movable error");
         if (!has_value()) throw bad_expected_access<E>(std::move(this->data_.error));
         if constexpr (!std::is_void_v<T>) return std::move(this->data_.value);
     }
@@ -682,7 +686,14 @@ public:
         if constexpr (!std::is_void_v<T>) return std::move(this->data_.value);
     }
     constexpr rref<const T> value() const && {
-        if (!has_value()) throw bad_expected_access<E>(std::move(this->data_.error));
+        static_assert(std::is_copy_constructible_v<E>, "value requires a copyable error");
+        if (!has_value()) {
+            // The void specialization's native const& observer also handles
+            // const rvalues. Its exception copies, rather than const-moves, E.
+            if constexpr (std::is_void_v<T>)
+                throw bad_expected_access<E>(static_cast<const E&>(this->data_.error));
+            else throw bad_expected_access<E>(std::move(this->data_.error));
+        }
         if constexpr (!std::is_void_v<T>) return std::move(this->data_.value);
     }
     constexpr const E&& error() const && noexcept {

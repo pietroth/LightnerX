@@ -27,6 +27,13 @@ struct FallbackValue {
     explicit FallbackValue(FallbackSource&&) noexcept {}
     FallbackValue(const FallbackSource&) noexcept(false) {}
 };
+struct AccessError {
+    int category = 0;
+    AccessError() = default;
+    AccessError(const AccessError&) : category(1) {}
+    AccessError(const AccessError&&) : category(2) {}
+    AccessError(AccessError&& other) noexcept : category(other.category) {}
+};
 struct Immovable {
     int value;
     explicit Immovable(int n) : value(n) {}
@@ -144,6 +151,12 @@ void construction() {
     success.value();
     *success;
     assert(success);
+    const expected<void, AccessError> void_error(unexpect);
+    try { std::move(void_error).value(); assert(false); }
+    catch (const subject::bad_expected_access<AccessError>& e) { assert(e.error().category == 1); }
+    const expected<int, AccessError> value_error(unexpect);
+    try { std::move(value_error).value(); assert(false); }
+    catch (const subject::bad_expected_access<AccessError>& e) { assert(e.error().category == 2); }
     for (int qualifier = 0; qualifier != 4; ++qualifier) {
         expected<int, std::string> bad(unexpect, "error");
         try {
