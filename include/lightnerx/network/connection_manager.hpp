@@ -14,7 +14,7 @@
 #include <lightnerx/network/network_manager.hpp>
 
 namespace lightnerx::network {
-    constexpr int invalidConnection = 0;
+    inline constexpr int invalidConnection = 0;
 
     class ConnectionManager {
     private:

@@ -9,10 +9,10 @@
 namespace lightnerx::communication {
     using namespace lightnerx::communication;
 
-    constexpr std::uint8_t APPROVED_RESPONSE = 0;
-    constexpr std::uint8_t DENIED_RESPONSE = 1;
-    constexpr std::uint8_t PARTIALLY_APPROVED_RESPONSE = 2;
-    constexpr std::uint8_t FAILURE_RESPONSE = 3;
+    inline constexpr std::uint8_t APPROVED_RESPONSE = 0;
+    inline constexpr std::uint8_t DENIED_RESPONSE = 1;
+    inline constexpr std::uint8_t PARTIALLY_APPROVED_RESPONSE = 2;
+    inline constexpr std::uint8_t FAILURE_RESPONSE = 3;
 
     #pragma pack(push, 1)
 

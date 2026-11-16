@@ -17,8 +17,8 @@
 #include <lightnerx/network/network_manager.hpp>
 
 namespace lightnerx::network {
-    constexpr HSteamListenSocket k_invalidSocket = 0;
-    constexpr HSteamNetPollGroup k_invalidPollGroup = 0;
+    inline constexpr HSteamListenSocket k_invalidSocket = 0;
+    inline constexpr HSteamNetPollGroup k_invalidPollGroup = 0;
 
     class Server {
     private:
