@@ -41,6 +41,11 @@ add_test(NAME lightnerx.message_faults
 )
 set_tests_properties(lightnerx.message_faults PROPERTIES TIMEOUT 180)
 
+add_test(NAME lightnerx.transport_faults
+    COMMAND ${Python3_EXECUTABLE} "${CMAKE_CURRENT_SOURCE_DIR}/transport_faults.py"
+        --compiler "${CMAKE_CXX_COMPILER}" "--flags=${CMAKE_CXX_FLAGS}" ${message_fault_options})
+set_tests_properties(lightnerx.transport_faults PROPERTIES TIMEOUT 180)
+
 add_test(NAME lightnerx.lifecycle_faults
     COMMAND ${Python3_EXECUTABLE} "${CMAKE_CURRENT_SOURCE_DIR}/lifecycle_faults.py"
         --compiler "${CMAKE_CXX_COMPILER}" "--flags=${CMAKE_CXX_FLAGS}" --library "$<TARGET_FILE:GameNetworkingSockets>"
@@ -53,6 +58,20 @@ add_test(NAME lightnerx.integration
         "$<TARGET_FILE:lightnerx_test_lifecycle>"
 )
 set_tests_properties(lightnerx.integration PROPERTIES TIMEOUT 60)
+
+set(LIGHTNERX_REFERENCE_BINARY "" CACHE FILEPATH "Original C++26 lifecycle executable for cross-version UDP tests")
+if(LIGHTNERX_REFERENCE_BINARY)
+    if(NOT EXISTS "${LIGHTNERX_REFERENCE_BINARY}")
+        message(FATAL_ERROR "LIGHTNERX_REFERENCE_BINARY does not exist")
+    endif()
+    foreach(role IN ITEMS server client)
+        add_test(NAME lightnerx.reference_${role}
+            COMMAND ${Python3_EXECUTABLE} "${CMAKE_CURRENT_SOURCE_DIR}/integration.py"
+                "$<TARGET_FILE:lightnerx_test_lifecycle>"
+                --${role}-binary "${LIGHTNERX_REFERENCE_BINARY}")
+        set_tests_properties(lightnerx.reference_${role} PROPERTIES TIMEOUT 60)
+    endforeach()
+endif()
 
 # Configure a separate parent project: no inherited target/directory requirements.
 add_test(NAME lightnerx.consumer
