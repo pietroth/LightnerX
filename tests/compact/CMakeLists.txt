@@ -8,7 +8,9 @@ function(lightnerx_compact_test name standard native)
     add_executable(${target} ${name}.cpp)
     target_include_directories(${target} PRIVATE "${PROJECT_SOURCE_DIR}/include")
     set_target_properties(${target} PROPERTIES
-        CXX_STANDARD ${standard} CXX_STANDARD_REQUIRED ON CXX_EXTENSIONS OFF)
+        CXX_STANDARD ${standard} CXX_STANDARD_REQUIRED ON CXX_EXTENSIONS OFF
+        # CMake 4.5 may otherwise synthesize standard modules for native oracles.
+        CXX_MODULE_STD OFF CXX_SCAN_FOR_MODULES OFF)
     if(native)
         target_compile_definitions(${target} PRIVATE LIGHTNERX_NATIVE_REFERENCE)
     endif()
