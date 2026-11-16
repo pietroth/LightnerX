@@ -13,7 +13,7 @@ parser.add_argument('--native', action='store_true')
 args = parser.parse_args()
 headers = ('#include <span>\n#include <expected>\nnamespace c = std;\n' if args.native else
            '#include <lightnerx/compact/span.hpp>\n#include <lightnerx/compact/expected.hpp>\nnamespace c = lightnerx::compact;\n')
-headers += '#include <array>\n#include <deque>\n#include <vector>\n'
+headers += '#include <array>\n#include <deque>\n#include <memory>\n#include <vector>\n'
 cases = {
     'fixed extent mismatch': 'std::array<int, 3> a{}; c::span<int, 2> s(a);',
     'discarding const': 'const int a[2]{}; c::span<int> s(a);',
@@ -25,6 +25,7 @@ cases = {
     'const error': 'c::expected<int, const int> e;',
     'void error': 'c::expected<int, void> e;',
     'unexpected void': 'c::unexpected<void> e;',
+    'value access with noncopyable error': 'c::expected<int,std::unique_ptr<int>> e(1); std::move(e).value();',
     'invalid monad error': 'c::expected<int,int> e; e.and_then([](int){ return c::expected<int,long>{}; });',
     'invalid monad value': 'c::expected<int,int> e; e.or_else([](int){ return c::expected<long,int>{}; });',
 }
