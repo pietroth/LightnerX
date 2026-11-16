@@ -138,10 +138,12 @@ public:
 
     template<class R, std::size_t N = Extent,
              std::enable_if_t<span_detail::range_ok<R, T>::value && N == dynamic_extent, int> = 0>
-    constexpr span(R&& range) : storage(std::size(range)), pointer_(std::data(range)) {}
+    constexpr span(R&& range) noexcept(noexcept(std::data(range)) && noexcept(std::size(range)))
+        : storage(std::size(range)), pointer_(std::data(range)) {}
     template<class R, std::size_t N = Extent,
              std::enable_if_t<span_detail::range_ok<R, T>::value && N != dynamic_extent, int> = 0>
-    constexpr explicit span(R&& range) : storage(std::size(range)), pointer_(std::data(range)) {}
+    constexpr explicit span(R&& range) noexcept(noexcept(std::data(range)) && noexcept(std::size(range)))
+        : storage(std::size(range)), pointer_(std::data(range)) {}
 
     template<class U, std::size_t N,
              std::enable_if_t<span_detail::compatible<U, T>::value &&

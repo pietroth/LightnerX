@@ -22,6 +22,13 @@ namespace subject = lightnerx::compact;
 
 struct Base { int value; };
 struct Derived : Base { int extra; };
+struct ThrowingRange {
+    int values[2]{};
+    int* begin() noexcept { return values; }
+    int* end() noexcept { return values + 2; }
+    int* data() { throw 73; }
+    std::size_t size() const noexcept { return 2; }
+};
 using subject::span;
 static_assert(std::is_default_constructible_v<span<int>>);
 static_assert(std::is_default_constructible_v<span<int, 0>>);
@@ -37,6 +44,11 @@ static_assert(std::is_constructible_v<span<int, 2>, span<int>>);
 static_assert(!std::is_convertible_v<span<int>, span<int, 2>>);
 static_assert(std::is_convertible_v<span<int, 2>, span<int>>);
 static_assert(std::is_constructible_v<span<int>, std::vector<int>&>);
+static_assert(std::is_nothrow_constructible_v<span<int>, std::vector<int>&>);
+static_assert(std::is_nothrow_constructible_v<span<int, 3>, std::vector<int>&>);
+static_assert(std::is_nothrow_constructible_v<span<const char>, std::string_view>);
+static_assert(std::is_constructible_v<span<int>, ThrowingRange&>);
+static_assert(!std::is_nothrow_constructible_v<span<int>, ThrowingRange&>);
 static_assert(!std::is_constructible_v<span<int>, std::vector<int>>);
 static_assert(std::is_constructible_v<span<const int>, std::vector<int>>);
 static_assert(!std::is_constructible_v<span<int>, const std::vector<int>&>);
@@ -72,6 +84,9 @@ constexpr bool constant_operations() {
 static_assert(constant_operations());
 
 int main() {
+    ThrowingRange throwing;
+    try { span<int> view(throwing); (void)view; assert(false); }
+    catch (int error) { assert(error == 73); }
     std::vector<int> values{1, 2, 3, 4};
     span from_range(values);
     span from_iterators(values.begin(), values.end());
