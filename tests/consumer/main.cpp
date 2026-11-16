@@ -1,6 +1,9 @@
 #include <steam/steamnetworkingsockets.h>
 
 #include <type_traits>
+#include <array>
+#include <lightnerx/network/server.hpp>
+#include <lightnerx/communication/response.hpp>
 #include <lightnerx/network/client.hpp>
 #include <lightnerx/network/transport.hpp>
 #include <lightnerx/network/message_batch.hpp>
@@ -10,11 +13,20 @@ static_assert(lightnerx::network::k_invalidConnection == k_HSteamNetConnection_I
 static_assert(!std::is_copy_constructible_v<lightnerx::network::Client>);
 
 const void* producerStateAddress();
+std::array<const void*, 8> producerConstantAddresses();
 bool queueFromProducer();
 
 int main() {
     lightnerx::network::Client client;
     namespace network = lightnerx::network;
+    namespace communication = lightnerx::communication;
+    const std::array<const void*, 8> constants{
+        &communication::APPROVED_RESPONSE, &communication::DENIED_RESPONSE,
+        &communication::PARTIALLY_APPROVED_RESPONSE, &communication::FAILURE_RESPONSE,
+        &network::k_invalidConnection, &network::k_invalidSocket,
+        &network::k_invalidPollGroup, &network::invalidConnection
+    };
+    if (producerConstantAddresses() != constants) return 8;
     if (client.getServerHConn() != network::k_invalidConnection) return 1;
     if (producerStateAddress() != &network::g_bNetworkInitialized) return 2;
     if (!network::networkInit()) return 3;
