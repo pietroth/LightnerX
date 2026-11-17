@@ -2,6 +2,15 @@
 
 LightnerX is a static C++17 library for building applications that communicate using the INER semantic protocol. The CMake project provides the `LightnerX` target; it neither produces nor requires its own executable. The library provides types for representing messages, interpreters, callbacks, connection management, and a transport layer based on GameNetworkingSockets.
 
+## Why LightnerX?
+
+LightnerX keeps client-server communication simple through a clear message model and modular components:
+
+- **Simple integration:** connect networking and message handling through callbacks, while keeping control over initialization, update timing, and threads.
+- **Standardized communication:** INER gives client and server a shared vocabulary for action requests, results, events, and informational updates, making each message's purpose and direction explicit.
+- **Modularity:** compose message interpreters, connection management, and transport components according to your application's needs.
+- **Application flexibility:** define your own message types and payloads while following the same communication model.
+
 INER defines the meaning of messages exchanged between an Authority and an Obedient. It does not define sockets, connections, or an execution model. These capabilities are provided by LightnerX's networking components and can be connected to the application according to the developer's needs.
 
 Build with CMake 3.22 or newer and a C++17 compiler. Public headers live under `include/lightnerx/`; byte views and results use the project’s own [`lightnerx::compact`](docs/compact.md) types. See [Setup](docs/setup.md) for dependencies and tested toolchains.
@@ -30,6 +39,17 @@ For example, you can pass one complete INER message from your own transport to `
 ### INER message flow
 
 The INER protocol defines four message types exchanged between the Authority and the Obedient:
+
+Choose the message type according to its purpose and direction. In a typical client-server application, the server acts as the Authority and the client as the Obedient.
+
+| Message type | Direction | When to use it | Examples |
+| --- | --- | --- | --- |
+| **Intention** | Client → Server | Request an action that the Authority must evaluate. | Move a player, fire a weapon, use an item, join a match. |
+| **Notification** | Client → Server | Report information without requesting a change to the Authority's internal state. | Report measured ping/latency, FPS, or client diagnostics. |
+| **Event** | Server → Client | Communicate an occurrence or state update from the Authority. | A player joined, an entity moved, a projectile spawned, a match started. |
+| **Response** | Server → Client | Return the outcome of a specific Intention, linked by its `correlationId`. | Movement approved, firing denied because ammunition is insufficient, an action partially applied, or processing failed. |
+
+These examples describe application-defined messages; LightnerX does not provide built-in gameplay commands or telemetry formats. A Response reports an Intention's outcome, while an Event communicates an occurrence to the relevant clients.
 
 ```mermaid
 flowchart LR
