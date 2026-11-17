@@ -4,7 +4,7 @@ LightnerX is a static C++17 library. CMake provides the `LightnerX` target. The 
 
 ## Dependencies and toolchain
 
-Use CMake **4.5.0 or newer**, a C++17 compiler, and a build tool such as Ninja. CMake 4.5.0 was the latest stable release selected for this migration; CMake's version and the C++ language standard are independent requirements. Linux was validated with GCC 14.2 and Clang 19.1 in Debug and Release. GCC/libstdc++ 15.2 additionally validates the native comparison tests. Other platforms have not been validated by this migration.
+Use CMake **3.22 or newer**, a C++17 compiler, and a build tool such as Ninja. CMake 3.22 is the minimum selected for compatibility with older development environments; CMake's version and the C++ language standard are independent requirements. Linux was validated with GCC 14.2 and Clang 19.1 in Debug and Release. GCC/libstdc++ 15.2 additionally validates the native comparison tests. Other platforms have not been validated by this migration.
 
 GameNetworkingSockets is pinned as a submodule in `external/GameNetworkingSockets`. Initialize it from the repository root:
 
@@ -15,15 +15,17 @@ git submodule update --init --recursive
 Install OpenSSL and Protobuf development packages, the Protobuf compiler, and Python 3 when building tests. For example, on Debian 13:
 
 ```bash
-sudo apt-get install curl ca-certificates g++-14 clang-19 ninja-build libssl-dev libprotobuf-dev protobuf-compiler python3-venv pkg-config
-curl -fL https://github.com/Kitware/CMake/releases/download/v4.5.0/cmake-4.5.0-linux-x86_64.tar.gz -o /tmp/lightnerx-cmake.tar.gz
-echo '81f0d5b0960fb6adc8197030ffc827fba937640d51e73e39e0e9e40d88c66f6f  /tmp/lightnerx-cmake.tar.gz' | sha256sum -c -
-mkdir -p .tools/cmake
-tar -xzf /tmp/lightnerx-cmake.tar.gz --strip-components=1 -C .tools/cmake
-export PATH="$PWD/.tools/cmake/bin:$PATH"
+sudo apt-get install cmake g++-14 clang-19 ninja-build libssl-dev libprotobuf-dev protobuf-compiler python3-venv pkg-config
+cmake --version
 ```
 
-The download above is the official Linux x86_64 distribution, with its release checksum. For other architectures, choose the matching asset from the [CMake release](https://github.com/Kitware/CMake/releases/tag/v4.5.0). CMake 4.5.0 is not yet available through the Python package index.
+Use a distribution package providing CMake 3.22 or newer. To reproduce the minimum-version check independently of the system package:
+
+```bash
+python3 -m venv .venv
+.venv/bin/pip install cmake==3.22.0
+export PATH="$PWD/.venv/bin:$PATH"
+```
 
 If dependencies live in a separate prefix, pass `-DCMAKE_PREFIX_PATH=/path/to/prefix` when configuring. The local validation used Protobuf 3.21.12, OpenSSL 3.6.5 and Ninja 1.13.2.
 
@@ -41,7 +43,7 @@ To select a compiler, pass `-DCMAKE_C_COMPILER=gcc-14 -DCMAKE_CXX_COMPILER=g++-1
 The target propagates C++17, LightnerX headers, GameNetworkingSockets headers, compile definitions and link requirements. Consumers link `LightnerX`:
 
 ```cmake
-cmake_minimum_required(VERSION 4.5.0)
+cmake_minimum_required(VERSION 3.22)
 set(CMAKE_CXX_EXTENSIONS OFF)
 project(MyGame LANGUAGES C CXX)
 

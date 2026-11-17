@@ -7,15 +7,11 @@ target_sources(LightnerX
         message.cpp
         notification.cpp
         response.cpp
-    PUBLIC
-        FILE_SET HEADERS
-        BASE_DIRS "${PROJECT_SOURCE_DIR}/include"
-        FILES
-            "${PROJECT_SOURCE_DIR}/include/lightnerx/communication/base_protocol.hpp"
-            "${PROJECT_SOURCE_DIR}/include/lightnerx/communication/event.hpp"
-            "${PROJECT_SOURCE_DIR}/include/lightnerx/communication/intention.hpp"
-            "${PROJECT_SOURCE_DIR}/include/lightnerx/communication/mbt.hpp"
-            "${PROJECT_SOURCE_DIR}/include/lightnerx/communication/message.hpp"
-            "${PROJECT_SOURCE_DIR}/include/lightnerx/communication/notification.hpp"
-            "${PROJECT_SOURCE_DIR}/include/lightnerx/communication/response.hpp"
+        "${PROJECT_SOURCE_DIR}/include/lightnerx/communication/base_protocol.hpp"
+        "${PROJECT_SOURCE_DIR}/include/lightnerx/communication/event.hpp"
+        "${PROJECT_SOURCE_DIR}/include/lightnerx/communication/intention.hpp"
+        "${PROJECT_SOURCE_DIR}/include/lightnerx/communication/mbt.hpp"
+        "${PROJECT_SOURCE_DIR}/include/lightnerx/communication/message.hpp"
+        "${PROJECT_SOURCE_DIR}/include/lightnerx/communication/notification.hpp"
+        "${PROJECT_SOURCE_DIR}/include/lightnerx/communication/response.hpp"
 )
