@@ -15,11 +15,15 @@ git submodule update --init --recursive
 Install OpenSSL and Protobuf development packages, the Protobuf compiler, and Python 3 when building tests. For example, on Debian 13:
 
 ```bash
-sudo apt-get install g++-14 clang-19 ninja-build libssl-dev libprotobuf-dev protobuf-compiler python3-venv pkg-config
-python3 -m venv .venv
-.venv/bin/pip install cmake==4.5.0
-export PATH="$PWD/.venv/bin:$PATH"
+sudo apt-get install curl ca-certificates g++-14 clang-19 ninja-build libssl-dev libprotobuf-dev protobuf-compiler python3-venv pkg-config
+curl -fL https://github.com/Kitware/CMake/releases/download/v4.5.0/cmake-4.5.0-linux-x86_64.tar.gz -o /tmp/lightnerx-cmake.tar.gz
+echo '81f0d5b0960fb6adc8197030ffc827fba937640d51e73e39e0e9e40d88c66f6f  /tmp/lightnerx-cmake.tar.gz' | sha256sum -c -
+mkdir -p .tools/cmake
+tar -xzf /tmp/lightnerx-cmake.tar.gz --strip-components=1 -C .tools/cmake
+export PATH="$PWD/.tools/cmake/bin:$PATH"
 ```
+
+The download above is the official Linux x86_64 distribution, with its release checksum. For other architectures, choose the matching asset from the [CMake release](https://github.com/Kitware/CMake/releases/tag/v4.5.0). CMake 4.5.0 is not yet available through the Python package index.
 
 If dependencies live in a separate prefix, pass `-DCMAKE_PREFIX_PATH=/path/to/prefix` when configuring. The local validation used Protobuf 3.21.12, OpenSSL 3.6.5 and Ninja 1.13.2.
 
