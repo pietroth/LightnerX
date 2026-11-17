@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 4.5.0)
+cmake_minimum_required(VERSION 3.22)
 set(CMAKE_CXX_EXTENSIONS OFF)
 project(LightnerXConsumer LANGUAGES C CXX)
 

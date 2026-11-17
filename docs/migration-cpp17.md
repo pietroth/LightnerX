@@ -12,7 +12,7 @@ All 14 module units now have declarations in `include/lightnerx/{communication,n
 
 Consumer source changes are limited to including the corresponding headers, using `lightnerx::compact::span` and `lightnerx::compact::expected` with their associated helpers, and selecting the new CMake configuration. The custom types implement the C++20 `std::span` and C++23 `std::expected` interfaces within the [documented C++17 limits](compact.md). Application names, callback shapes, ownership, error codes and protocol behavior remain the same. Consumers must be rebuilt; binary ABI compatibility with module builds or native standard-library types is not promised.
 
-CMake 4.5.0 and the public `cxx_std_17` requirement replace the experimental module build. Standard includes, iterator algorithms and explicit function templates replace newer language/library facilities. [Setup](setup.md) contains current commands.
+CMake 3.22 or newer and the public `cxx_std_17` requirement replace the experimental module build. Standard includes, iterator algorithms and explicit function templates replace newer language/library facilities. [Setup](setup.md) contains current commands.
 
 ## Preserved behavior
 
@@ -29,6 +29,8 @@ The original C++26 revision was built separately with GCC/libstdc++ 15.2.0, CMak
 [Fixture provenance](../tests/fixtures/reference.json) records the platform, revision and toolchain. [The captured fixture](../tests/fixtures/cpp26-behavior.txt) includes error codes, serialized bytes and a deterministic parsing corpus with seed `0x4c58`: 13,275 invocations, 1,897 delivered messages and digest `14252850176607638377`. The C++17 executable must reproduce the entire output byte for byte. Runtime handles, addresses, ephemeral ports, timings and localized error strings are excluded. The fixture was recorded on Linux x86_64 with little-endian fields; it is not a claim of cross-endian wire compatibility.
 
 The compact tests run the same sources against native types in separate C++20/23 executables and compare outputs. Compile-time checks and invalid-program tests cover construction constraints and API contracts. Real UDP tests also pair the original server with the new client and the original client with the new server.
+
+The minimum was subsequently lowered to CMake 3.22 for compatibility. Header file sets (introduced in CMake 3.23) were replaced with ordinary private header source entries; include paths and C++17 requirements still propagate through the target. The original C++26 reference build retains its separate CMake 4.2.3 requirement.
 
 ## Local results
 
@@ -48,3 +50,7 @@ All 56 C++ documentation blocks are compiled with C++17: complete examples retai
 These results include no skipped tests. Build directories retain `results.xml`, `tests.log` and CTest's `Testing/Temporary/LastTest.log`; generated logs are not committed. The [CI workflow](../.github/workflows/cpp17.yml) repeats Linux compiler/configuration checks and the separate native/original-reference comparison, and uploads test artifacts.
 
 GameNetworkingSockets is not sanitizer-instrumented and disables RTTI. GNS-linked targets therefore exclude only UBSan's `vptr` check. The independent compact and mock tests retain all selected checks. Windows and macOS were not validated. See [sanitizer instructions](setup.md#sanitizers) and [compact limitations](compact.md#c17-limits-and-verification) when interpreting coverage.
+
+## Minimum CMake compatibility check
+
+The compatibility adjustment was validated with CMake/CTest **3.22.0** in fresh Linux Debug build directories. GCC 14 passed all 15 standard tests, including the independent consumer build and compiled documentation. GCC/libstdc++ 15 passed all 22 tests with native comparisons and both C++26/C++17 UDP directions enabled. Neither run skipped tests. Logs are in `build/cmake322-gcc/` and `build/cmake322-native/`. The CI compiler/configuration matrix now uses CMake 3.22.0 for the migrated project.
