@@ -35,6 +35,7 @@ Thumbs.db
 # Cache
 .cache/
 .venv/
+.tools/
 __pycache__/
 *.py[cod]
 
