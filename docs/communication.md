@@ -40,6 +40,17 @@ interpreter.authorityInterpret(bytes);
 
 ## Message types
 
+Choose the message type according to its purpose and direction. In a typical client-server application, the server acts as the Authority and the client as the Obedient.
+
+| Message type | Direction | When to use it | Examples |
+| --- | --- | --- | --- |
+| **Intention** | Client → Server | Request an action that the Authority must evaluate. | Move a player, fire a weapon, use an item, join a match. |
+| **Notification** | Client → Server | Report information without requesting a change to the Authority's internal state. | Report measured ping/latency, FPS, or client diagnostics. |
+| **Event** | Server → Client | Communicate an occurrence or state update from the Authority. | A player joined, an entity moved, a projectile spawned, a match started. |
+| **Response** | Server → Client | Return the outcome of a specific Intention, linked by its `correlationId`. | Movement approved, firing denied because ammunition is insufficient, an action partially applied, or processing failed. |
+
+These examples describe application-defined messages; LightnerX does not provide built-in gameplay commands or telemetry formats. A Response reports an Intention's outcome, while an Event communicates an occurrence to the relevant clients.
+
 ### Event
 
 `Event` communicates an occurrence from the Authority. Its header contains:
