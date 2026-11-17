@@ -1,10 +1,12 @@
 # API reference
 
-This page presents the public components grouped by module. All modules are imported with `import` and belong to the indicated namespaces.
+This page groups public components by header. Include the indicated header with `#include`; declarations belong to the indicated namespaces. Signature blocks are excerpts from class or namespace declarations, while usage blocks assume the objects described in their surrounding text.
 
-Operations that return `std::expected<void, std::error_code>` can be checked with `if (!result)`. In the event of an error, `result.error()` provides the code and `result.error().message()` provides its description. Complete examples are available in [First steps](first-steps.md).
+The library uses its own C++17 [compact types](compact.md): `lightnerx::compact::span` provides a non-owning view of contiguous elements, and `lightnerx::compact::expected` holds a value or an error.
 
-## `lightnerx.communication.base_protocol`
+Operations that return `lightnerx::compact::expected<void, std::error_code>` can be checked with `if (!result)`. In the event of an error, `result.error()` provides the code and `result.error().message()` provides its description. Complete examples are available in [First steps](first-steps.md).
+
+## `<lightnerx/communication/base_protocol.hpp>`
 
 ### `lightnerx::communication::BaseProtocol`
 
@@ -17,7 +19,7 @@ BaseProtocol(std::uint16_t size);
 - `size`: when constructing a message for sending, the encoded size of the Authority's message or the total size of the Obedient's message. The interpreter delivers this field with the size already decoded.
 - Public field: `std::uint16_t size`.
 
-## `lightnerx.communication.mbt`
+## `<lightnerx/communication/mbt.hpp>`
 
 ### `lightnerx::communication::MBT`
 
@@ -31,7 +33,7 @@ MBT(std::uint16_t type);
 
 ## Message types
 
-### `lightnerx.communication.event`
+### `<lightnerx/communication/event.hpp>`
 
 ### `lightnerx::communication::Event`
 
@@ -46,7 +48,7 @@ Public fields:
 - `protocol`: `BaseProtocol`;
 - `mbt`: `MBT`.
 
-### `lightnerx.communication.notification`
+### `<lightnerx/communication/notification.hpp>`
 
 ### `lightnerx::communication::Notification`
 
@@ -73,7 +75,7 @@ bool exist(std::uint16_t id) const noexcept;
 
 `registerId` adds an ID, and `registerIds` incorporates the IDs from a set passed as a temporary or with `std::move`. `exist()` reports whether the ID is registered. The application provides the registry to `obedientInterpret`.
 
-### `lightnerx.communication.intention`
+### `<lightnerx/communication/intention.hpp>`
 
 ### `lightnerx::communication::Intention`
 
@@ -93,7 +95,7 @@ Public fields:
 - `mbt`: `MBT`;
 - `correlationId`: identifier used to correlate the response.
 
-### `lightnerx.communication.response`
+### `<lightnerx/communication/response.hpp>`
 
 ### `lightnerx::communication::Response`
 
@@ -136,13 +138,13 @@ Public fields:
 ### Status constants
 
 ```cpp
-constexpr std::uint8_t APPROVED_RESPONSE = 0;
-constexpr std::uint8_t DENIED_RESPONSE = 1;
-constexpr std::uint8_t PARTIALLY_APPROVED_RESPONSE = 2;
-constexpr std::uint8_t FAILURE_RESPONSE = 3;
+inline constexpr std::uint8_t APPROVED_RESPONSE = 0;
+inline constexpr std::uint8_t DENIED_RESPONSE = 1;
+inline constexpr std::uint8_t PARTIALLY_APPROVED_RESPONSE = 2;
+inline constexpr std::uint8_t FAILURE_RESPONSE = 3;
 ```
 
-## `lightnerx.communication.message`
+## `<lightnerx/communication/message.hpp>`
 
 ### `lightnerx::communication::Message`
 
@@ -157,7 +159,7 @@ struct Message {
         UnsuccessfulResponse,
         Notification
     > header;
-    std::span<const std::byte> payload;
+    lightnerx::compact::span<const std::byte> payload;
 };
 ```
 
@@ -185,7 +187,7 @@ The callback registered with `addAuthorityInterpretedMessageCallback` receives m
 
 ```cpp
 void obedientInterpret(
-    std::span<const std::byte> data,
+    lightnerx::compact::span<const std::byte> data,
     const NotificationRegistry& registry,
     HSteamNetConnection hConn,
     const lightnerx::network::ConnectionManager& connManager
@@ -197,7 +199,7 @@ Interprets messages sent by the Obedient. IDs found in the registry are treated 
 #### Interpretation on the client
 
 ```cpp
-void authorityInterpret(std::span<const std::byte> data);
+void authorityInterpret(lightnerx::compact::span<const std::byte> data);
 ```
 
 Interprets `Event` and responses sent by the Authority. The type bit selects event or response; the status selects `Response` or `UnsuccessfulResponse`. The approved and failure statuses deliver an empty payload; denial and partial approval deliver the bytes following `UnsuccessfulResponse`.
@@ -211,31 +213,31 @@ The functions below return `lightnerx::network::OutboundMessage`:
 ```cpp
 lightnerx::network::OutboundMessage event2OutboundMessage(
     const Event& event,
-    std::span<const std::byte> payload,
+    lightnerx::compact::span<const std::byte> payload,
     lightnerx::network::Target target
 );
 
 lightnerx::network::OutboundMessage intention2OutboundMessage(
     const Intention& intention,
-    std::span<const std::byte> payload,
+    lightnerx::compact::span<const std::byte> payload,
     lightnerx::network::Target target
 );
 
 lightnerx::network::OutboundMessage response2OutboundMessage(
     const Response& response,
-    std::span<const std::byte> payload,
+    lightnerx::compact::span<const std::byte> payload,
     lightnerx::network::Target target
 );
 
 lightnerx::network::OutboundMessage unsuccessfulResponse2OutboundMessage(
     const UnsuccessfulResponse& response,
-    std::span<const std::byte> payload,
+    lightnerx::compact::span<const std::byte> payload,
     lightnerx::network::Target target
 );
 
 lightnerx::network::OutboundMessage notification2OutboundMessage(
     const Notification& notification,
-    std::span<const std::byte> payload,
+    lightnerx::compact::span<const std::byte> payload,
     lightnerx::network::Target target
 );
 ```
@@ -244,7 +246,7 @@ The converters allocate a `SteamNetworkingMessage_t`, copy the header, and appen
 
 Initialize the network before using them. The caller fills in the `size` field according to the [binary representation](communication.md#binary-representation) and passes the created object to `queueMessage`, which takes ownership of it. If the object is never passed to the queue, the caller must release it with `Release()`. For the recommended emission formats, provide `{}` as the payload for approved, denied, or failure responses; for partial approval, provide the bytes defined by the application. Converters copy the supplied payload without enforcing these status-specific recommendations.
 
-## `lightnerx.network.network_manager`
+## `<lightnerx/network/network_manager.hpp>`
 
 Functions for controlling the global network state:
 
@@ -260,9 +262,9 @@ Exactly one started `Client` **or** `Server` may own the runtime per process. St
 
 While a wrapper owns the runtime, `networkKill()` defers shutdown until that owner releases it. The interface remains usable and `isNetworkInitialized()` remains true in the meantime. Direct external `GameNetworkingSockets_Kill()` and raw `RunCallbacks()` during wrapper ownership are unsupported; use LightnerX lifecycle and update operations. Synchronize all network operations across threads in the application.
 
-`k_invalidConnection` has one declaration in this module, re-exported by the client and transport modules.
+`k_invalidConnection` is declared once in `<lightnerx/network/network_manager.hpp>`, which is included by the client and transport headers.
 
-## `lightnerx.network.server`
+## `<lightnerx/network/server.hpp>`
 
 ### `lightnerx::network::Server`
 
@@ -281,7 +283,7 @@ void addClientDisconnectedCallback(
 
 void addClientReceivedMessageCallback(
     std::function<void(
-        std::span<const std::byte>,
+        lightnerx::compact::span<const std::byte>,
         HSteamNetConnection
     )> callback
 );
@@ -290,14 +292,14 @@ void addClientReceivedMessageCallback(
 #### Lifecycle
 
 ```cpp
-std::expected<void, std::error_code> start(
+lightnerx::compact::expected<void, std::error_code> start(
     int port,
     std::uint32_t timeoutConnected
 );
 
-std::expected<void, std::error_code> update();
+lightnerx::compact::expected<void, std::error_code> update();
 
-std::expected<void, std::error_code> disconnectConnection(
+lightnerx::compact::expected<void, std::error_code> disconnectConnection(
     HSteamNetConnection hConn,
     bool enableLinger
 );
@@ -311,7 +313,7 @@ The connection callback is called after acceptance and assignment to the poll gr
 
 `disconnectConnection()` requests that a specific connection be closed and, on success, calls the disconnection callbacks. `enableLinger` is forwarded to the transport to control the attempt to send pending data when closing. `close()` closes the listen socket, destroys the poll group, and shuts down GameNetworkingSockets. It is idempotent and also runs from the destructor. A close requested inside a callback is completed after the outer operation releases received messages; remaining callbacks in that dispatch are skipped. Bulk close does not emit individual disconnection callbacks: clear application registrations before reusing a manager for a new session. Disconnection callbacks receive a historical handle after closure; `ConnectionManager::getClientId()` remains valid until `remove()`.
 
-## `lightnerx.network.client`
+## `<lightnerx/network/client.hpp>`
 
 ### `lightnerx::network::Client`
 
@@ -319,21 +321,21 @@ Client that connects to an IP address and processes messages from the connection
 
 ```cpp
 void addServerReceivedMessageCallback(
-    const std::function<void(std::span<const std::byte>)>& callback
+    const std::function<void(lightnerx::compact::span<const std::byte>)>& callback
 );
 
-std::expected<void, std::error_code> start();
+lightnerx::compact::expected<void, std::error_code> start();
 
-std::expected<void, std::error_code> connect(
+lightnerx::compact::expected<void, std::error_code> connect(
     std::string_view ip,
     int port
 );
 
-std::expected<void, std::error_code> update(
+lightnerx::compact::expected<void, std::error_code> update(
     int maxMessagesToProcess
 );
 
-std::expected<void, std::error_code> disconnect(
+lightnerx::compact::expected<void, std::error_code> disconnect(
     bool enableLinger
 );
 
@@ -347,7 +349,7 @@ HSteamNetConnection getServerHConn() const noexcept;
 
 `disconnect()` requests that the connection be closed and forwards `enableLinger` to the transport. On success it immediately invalidates the handle and clears `isConnected()`, allowing another `connect()` on the same instance. It retains ownership of the runtime until the destructor. Disconnecting inside a receive callback stops further callbacks and messages from that receive batch; all acquired messages are released. The destructor closes the existing connection and shuts down networking.
 
-## `lightnerx.network.connection_manager`
+## `<lightnerx/network/connection_manager.hpp>`
 
 ### `lightnerx::network::ConnectionManager`
 
@@ -369,7 +371,8 @@ void remove(int id);
 
 int getOnlineCount() const noexcept;
 
-void forEach(const auto& callback) const;
+template<class Callback>
+void forEach(const Callback& callback) const;
 ```
 
 `initialReserve` reserves storage space, and `maxCapacity` defines the maximum number of registered connections. `add` registers a handle and returns the assigned ID, or an empty `std::optional` when registration is not performed. `remove` unregisters the ID; closing the connection is handled by the networking component.
@@ -388,13 +391,13 @@ connections.forEach(
 );
 ```
 
-## `lightnerx.network.transport`
+## `<lightnerx/network/transport.hpp>`
 
 ### Direct sending
 
 ```cpp
-std::expected<void, std::error_code> sendToConnection(
-    std::span<const std::byte> message,
+lightnerx::compact::expected<void, std::error_code> sendToConnection(
+    lightnerx::compact::span<const std::byte> message,
     HSteamNetConnection hConn
 );
 ```
@@ -404,8 +407,8 @@ Forwards the bytes to GameNetworkingSockets with the reliable send option. The r
 ### Sending to a group
 
 ```cpp
-std::expected<void, std::error_code> sendToConnections(
-    std::span<const std::byte> message,
+lightnerx::compact::expected<void, std::error_code> sendToConnections(
+    lightnerx::compact::span<const std::byte> message,
     const std::vector<HSteamNetConnection> connections
 );
 ```
@@ -415,8 +418,8 @@ Forwards the same bytes to each handle in the vector. Attempts all destinations 
 ### Broadcast
 
 ```cpp
-std::expected<void, std::error_code> broadcast(
-    std::span<const std::byte> message,
+lightnerx::compact::expected<void, std::error_code> broadcast(
+    lightnerx::compact::span<const std::byte> message,
     const lightnerx::network::ConnectionManager& connectionManager,
     const std::vector<HSteamNetConnection> exceptions
 );
@@ -431,7 +434,7 @@ const auto others = lightnerx::network::broadcast(bytes, connections, {connectio
 
 The examples above are independent calls; check the result of each send used by the application. To defer sending until a flush, use `Target::broadcast` with `queueMessage`.
 
-## `lightnerx.network.target`
+## `<lightnerx/network/target.hpp>`
 
 ### `lightnerx::network::Target`
 
@@ -469,7 +472,7 @@ std::variant<
 std::vector<HSteamNetConnection> broadcastExceptions;
 ```
 
-## `lightnerx.network.message_batch`
+## `<lightnerx/network/message_batch.hpp>`
 
 ### `lightnerx::network::OutboundMessage`
 
@@ -486,9 +489,9 @@ struct OutboundMessage {
 void initMessagesBatcher(int capacity);
 void clearMessagesBatcher() noexcept;
 
-std::expected<void, std::error_code> queueMessage(OutboundMessage message);
+lightnerx::compact::expected<void, std::error_code> queueMessage(OutboundMessage message);
 
-std::expected<void, std::error_code> flushAll(
+lightnerx::compact::expected<void, std::error_code> flushAll(
     const ConnectionManager& connectionManager
 );
 ```
@@ -513,9 +516,9 @@ auto outbound = lightnerx::communication::event2OutboundMessage(
 const auto queued = lightnerx::network::queueMessage(std::move(outbound));
 
 if (!queued) {
-    std::println("Failed to queue: {}", queued.error().message());
+    std::cout << "Failed to queue: " << queued.error().message() << '\n';
 } else if (const auto flushed = lightnerx::network::flushAll(connections); !flushed) {
-    std::println("Failed to send: {}", flushed.error().message());
+    std::cout << "Failed to send: " << flushed.error().message() << '\n';
 }
 ```
 

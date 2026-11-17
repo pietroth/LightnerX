@@ -1,38 +1,40 @@
-# Correções da auditoria LightnerX
+# Correções da auditoria LightnerX — registro histórico
+
+Este documento preserva os resultados da auditoria de 12/11/2026, anterior à migração. O LightnerX atual usa C++17 e headers clássicos; a validação atual está em [Migração C++17](migration-cpp17.md) e as instruções de build em [Setup](setup.md). Os caminhos da tabela abaixo foram atualizados para os arquivos atuais; os headers correspondentes estão em `include/lightnerx/`. Números, logs e limitações descritos como históricos referem-se exclusivamente à auditoria.
 
 Revisão de origem: `8e5a352`. Dependência GNS: `d534c19`. Auditoria lida:
 `LightnerX-audit.md`. Trabalho validado em 12/11/2026 com GCC/libstdc++ 15.2,
 CMake 4.2.3 e Ninja 1.13.2, em Linux.
 
 Os 14 itens foram confrontados com a revisão de origem e receberam correções.
-C++26, módulos, GameNetworkingSockets, representação binária INER e
+Naquela auditoria, C++26, módulos, GameNetworkingSockets, representação binária INER e
 `queueMessage(OutboundMessage)` com `Target` foram preservados. Não houve edição
 de terceiros; a alteração preexistente em
-`external/GameNetworkingSockets/examples/trivial_signaling_client.h` permanece.
+`external/GameNetworkingSockets/examples/trivial_signaling_client.h` foi mantida naquela auditoria.
 
 ## Resultado por item
 
 Os nomes de testes abaixo são os sufixos dos testes CTest `lightnerx.*`.
-Os caminhos de módulos sem prefixo estão em `network/`.
+Os caminhos de implementação sem prefixo estão em `network/`.
 
 | LX | Causa | Correção implementada | Arquivos de implementação/documentação | Testes executados | Classificação | Pendências |
 | --- | --- | --- | --- | --- | --- | --- |
-| LX-01 | Wrappers destruíam GNS diretamente, deixando flag e ponteiros inconsistentes. | Encerramento central, ownership explícito, limpeza de membros e rollback de inicialização. | `network_manager.cppm`, `client.cppm`, `server.cppm`, `docs/api.md` | `lifecycle`, `lifecycle_faults`, `integration` | Corrigido e validado | Nenhuma funcional. |
-| LX-02 | Consulta de identidade dependia de userdata em handle já fechado. | Mapa reverso local mantém a identidade até `remove()`, inclusive nos callbacks após o fechamento. | `connection_manager.cppm`, `server.cppm`, `docs/api.md` | `connection_manager`, `integration` com desconexões pelos dois lados | Corrigido e validado | Nenhuma. |
-| LX-03 | `return false` construía `optional<uint16_t>` presente com valor zero. | Lookup ausente retorna `nullopt`; zero não é um ID cadastrado. | `connection_manager.cppm` | `connection_manager`, `messages` | Corrigido e validado | Nenhuma. |
-| LX-04 | Último ID não era reciclado; contador e índice de 16 bits transbordavam. | Reciclagem de todos os IDs removidos, contador mais largo, domínio 1–65535 e iteração limitada com `size_t`. | `connection_manager.cppm`, `docs/api.md` | `connection_manager`: 70.000 ciclos; `connection_manager_domain`: domínio completo | Corrigido e validado | Domínio completo usa interface controlada, não 65.535 sockets reais simultâneos. |
-| LX-05 | Cópia implícita duplicava ownership e ponteiros de callbacks. | Cópia e movimentação excluídas em Client/Server; Server também encerra recursos no destrutor. | `client.cppm`, `server.cppm`, `docs/api.md` | `lifecycle` e `consumer`, com verificações de tipos em compilação | Corrigido e validado | Código consumidor que copiava wrappers deve ser adaptado. |
-| LX-06 | Desconexão local não limpava handle e estado. | Fechamento bem-sucedido invalida handle e limpa `connected`, permitindo reconexão. | `client.cppm`, `docs/api.md` | `lifecycle_faults`, `integration` | Corrigido e validado | Nenhuma. |
-| LX-07 | Recebimento negativo era tratado como fila vazia. | Retorna `io_error`; cliente também fecha/limpa sua conexão inválida. | `client.cppm`, `server.cppm`, `docs/api.md` | `lifecycle_faults`, com retorno -1 nos dois caminhos | Corrigido e validado | Falha rara provocada por injeção controlada. |
-| LX-08 | Cinco conversores desreferenciavam retorno nulo de `AllocateMessage`. | Verificação comum lança `bad_alloc`; tamanho irrepresentável lança `length_error` antes da alocação. | `communication/message.cppm`, `docs/api.md`, `docs/communication.md` | `message_faults`: cinco falhas de alocação e overflow; `messages`: GNS real | Corrigido e validado | Não foi necessário esgotar a memória do sistema. |
+| LX-01 | Wrappers destruíam GNS diretamente, deixando flag e ponteiros inconsistentes. | Encerramento central, ownership explícito, limpeza de membros e rollback de inicialização. | `network_manager.cpp`, `client.cpp`, `server.cpp`, `docs/api.md` | `lifecycle`, `lifecycle_faults`, `integration` | Corrigido e validado | Nenhuma funcional. |
+| LX-02 | Consulta de identidade dependia de userdata em handle já fechado. | Mapa reverso local mantém a identidade até `remove()`, inclusive nos callbacks após o fechamento. | `connection_manager.cpp`, `server.cpp`, `docs/api.md` | `connection_manager`, `integration` com desconexões pelos dois lados | Corrigido e validado | Nenhuma. |
+| LX-03 | `return false` construía `optional<uint16_t>` presente com valor zero. | Lookup ausente retorna `nullopt`; zero não é um ID cadastrado. | `connection_manager.cpp` | `connection_manager`, `messages` | Corrigido e validado | Nenhuma. |
+| LX-04 | Último ID não era reciclado; contador e índice de 16 bits transbordavam. | Reciclagem de todos os IDs removidos, contador mais largo, domínio 1–65535 e iteração limitada com `size_t`. | `connection_manager.cpp`, `docs/api.md` | `connection_manager`: 70.000 ciclos; `connection_manager_domain`: domínio completo | Corrigido e validado | Domínio completo usa interface controlada, não 65.535 sockets reais simultâneos. |
+| LX-05 | Cópia implícita duplicava ownership e ponteiros de callbacks. | Cópia e movimentação excluídas em Client/Server; Server também encerra recursos no destrutor. | `client.cpp`, `server.cpp`, `docs/api.md` | `lifecycle` e `consumer`, com verificações de tipos em compilação | Corrigido e validado | Código consumidor que copiava wrappers deve ser adaptado. |
+| LX-06 | Desconexão local não limpava handle e estado. | Fechamento bem-sucedido invalida handle e limpa `connected`, permitindo reconexão. | `client.cpp`, `docs/api.md` | `lifecycle_faults`, `integration` | Corrigido e validado | Nenhuma. |
+| LX-07 | Recebimento negativo era tratado como fila vazia. | Retorna `io_error`; cliente também fecha/limpa sua conexão inválida. | `client.cpp`, `server.cpp`, `docs/api.md` | `lifecycle_faults`, com retorno -1 nos dois caminhos | Corrigido e validado | Falha rara provocada por injeção controlada. |
+| LX-08 | Cinco conversores desreferenciavam retorno nulo de `AllocateMessage`. | Verificação comum lança `bad_alloc`; tamanho irrepresentável lança `length_error` antes da alocação. | `communication/message.cpp`, `docs/api.md`, `docs/communication.md` | `message_faults`: cinco falhas de alocação e overflow; `messages`: GNS real | Corrigido e validado | Não foi necessário esgotar a memória do sistema. |
 | LX-09 | C++26 e requisitos GNS não eram públicos no target; setup incompleto. | `cxx_std_26` e GNS públicos; configuração de `import std` e toolchain documentadas; consumidor independente. | `CMakeLists.txt`, `docs/setup.md`, `tests/consumer/` | `consumer`, compilação completa CMake/Ninja | Corrigido e validado | Outras toolchains não foram homologadas. |
-| LX-10 | Dois módulos exportavam constantes distintas com o mesmo nome. | Uma declaração de `k_invalidConnection` no gerenciador global, reexportada por cliente e transporte. | `network_manager.cppm`, `client.cppm`, `transport.cppm` | `consumer`, `lifecycle` | Corrigido e validado | Nenhuma. |
-| LX-11 | Instâncias competiam pelos callbacks e pela destruição global. | Um wrapper iniciado por processo; conflitos e repetição de start são rejeitados; shutdown respeita o owner. | `network_manager.cppm`, `client.cppm`, `server.cppm`, `README.md`, `docs/api.md`, `docs/first-steps.md` | `lifecycle`, `integration` | Corrigido e validado | Coexistência de vários wrappers não faz parte do contrato suportado. |
-| LX-12 | Userdata global permitia interferência entre managers e cadastros duplicados. | Mapeamento bidirecional próprio, pertencimento local, rejeição de duplicatas e validação do handle GNS na admissão. | `connection_manager.cppm`, `README.md`, `docs/api.md` | `connection_manager`: duplicatas, managers independentes, userdata preservada | Corrigido e validado | Transporte externo não ganha suporte a IDs arbitrários; restrição documentada. |
-| LX-13 | Parser ignorava divergência entre tamanho declarado e buffer. | Exige uma mensagem completa, tamanho decodificado igual ao span e header mínimo completo. | `communication/message.cppm`, `docs/api.md`, `docs/communication.md` | `messages`, `message_faults`: truncamentos, concatenação, tamanhos inválidos e limites 15/16 bits | Corrigido e validado | Nenhuma mudança de framing ou formato binário. |
-| LX-14 | Exceções vazavam buffers; registro reentrante invalidava vetores; `forEach` terminava o processo. | RAII em recebimento e batching, callbacks em armazenamento estável, propagação de exceções, captura na fronteira GNS, bloqueio de update recursivo e fechamento adiado. | `client.cppm`, `server.cppm`, `connection_manager.cppm`, `network_manager.cppm`, `message_batch.cppm`, `communication/message.cppm`, `docs/api.md` | `messages`, `message_faults`, `lifecycle_faults`, `connection_manager`, `integration`; ASan e UBSan conforme limites abaixo | Corrigido, mas parcialmente validado | UBSan modular indisponível no GCC 15.2; checagem vptr incompatível com GNS sem RTTI. |
+| LX-10 | Dois módulos exportavam constantes distintas com o mesmo nome. | Uma declaração de `k_invalidConnection` no gerenciador global, reexportada por cliente e transporte. | `network_manager.cpp`, `client.cpp`, `transport.cpp` | `consumer`, `lifecycle` | Corrigido e validado | Nenhuma. |
+| LX-11 | Instâncias competiam pelos callbacks e pela destruição global. | Um wrapper iniciado por processo; conflitos e repetição de start são rejeitados; shutdown respeita o owner. | `network_manager.cpp`, `client.cpp`, `server.cpp`, `README.md`, `docs/api.md`, `docs/first-steps.md` | `lifecycle`, `integration` | Corrigido e validado | Coexistência de vários wrappers não faz parte do contrato suportado. |
+| LX-12 | Userdata global permitia interferência entre managers e cadastros duplicados. | Mapeamento bidirecional próprio, pertencimento local, rejeição de duplicatas e validação do handle GNS na admissão. | `connection_manager.cpp`, `README.md`, `docs/api.md` | `connection_manager`: duplicatas, managers independentes, userdata preservada | Corrigido e validado | Transporte externo não ganha suporte a IDs arbitrários; restrição documentada. |
+| LX-13 | Parser ignorava divergência entre tamanho declarado e buffer. | Exige uma mensagem completa, tamanho decodificado igual ao span e header mínimo completo. | `communication/message.cpp`, `docs/api.md`, `docs/communication.md` | `messages`, `message_faults`: truncamentos, concatenação, tamanhos inválidos e limites 15/16 bits | Corrigido e validado | Nenhuma mudança de framing ou formato binário. |
+| LX-14 | Exceções vazavam buffers; registro reentrante invalidava vetores; `forEach` terminava o processo. | RAII em recebimento e batching, callbacks em armazenamento estável, propagação de exceções, captura na fronteira GNS, bloqueio de update recursivo e fechamento adiado. | `client.cpp`, `server.cpp`, `connection_manager.cpp`, `network_manager.cpp`, `message_batch.cpp`, `communication/message.cpp`, `docs/api.md` | `messages`, `message_faults`, `lifecycle_faults`, `connection_manager`, `integration`; ASan e UBSan conforme limites abaixo | Corrigido, mas parcialmente validado | UBSan modular indisponível no GCC 15.2; checagem vptr incompatível com GNS sem RTTI. |
 
-## Evidências e testes
+## Evidências e testes históricos
 
 A suíte normal passou nos oito testes, sem testes ignorados. Resultados locais:
 `build/audit/test-results.xml` e `build/audit/Testing/Temporary/LastTest.log`.
@@ -69,7 +71,9 @@ O consumidor original não encontrava o header Steam e compilava em C++17.
 O teste de domínio também foi aplicado ao arquivo original de `8e5a352` e falhou
 em `exhausted ID domain must reject add` (`build/audit/id-baseline.log`).
 
-## Reprodução
+## Reprodução com a versão C++17 atual
+
+Os comandos abaixo executam a suíte atual; não recriam os oito testes históricos. Para reproduzir o ambiente antigo, use a revisão e a toolchain daquela auditoria. O problema UBSan/módulos descrito abaixo não se aplica mais à implementação C++17; somente a incompatibilidade de `vptr` com GNS sem RTTI permanece.
 
 ```bash
 cmake -S . -B build/audit -G Ninja \
@@ -79,7 +83,7 @@ ctest --test-dir build/audit --output-on-failure --output-junit test-results.xml
 
 cmake -S . -B build/audit-sanitizers -G Ninja \
   -DCMAKE_BUILD_TYPE=Debug -DLIGHTNERX_BUILD_TESTS=ON \
-  -DLIGHTNERX_SANITIZERS=address
+  -DLIGHTNERX_SANITIZERS=address,undefined
 cmake --build build/audit-sanitizers --parallel 2
 ctest --test-dir build/audit-sanitizers --output-on-failure --output-junit test-results.xml -j 2
 ```
@@ -89,7 +93,7 @@ oferecia. A execução final usa o ambiente autorizado fora dessa restrição.
 O limite dos testes que compilam código foi ampliado para 180 segundos após um
 timeout de compilação concorrente; os limites de runtime permanecem delimitados.
 
-## Limites dos sanitizadores
+## Limites históricos dos sanitizadores
 
 Os módulos LightnerX e os consumidores foram compilados com ASan. Os três testes
 suplementares usam ASan e UBSan, com `-fno-sanitize-recover=all`, para que qualquer
@@ -109,7 +113,7 @@ teste suplementar de ciclo de vida, que chama a biblioteca real, usa
 exclusão. Esse diagnóstico foi investigado mesmo quando CTest inicialmente
 reportou sucesso por causa do modo recuperável padrão do UBSan.
 
-## API pública e contratos
+## API pública e contratos preservados
 
 - Client e Server não podem mais ser copiados ou movidos. Server ganha destrutor
   com limpeza automática; `close()` é idempotente e `noexcept`.
@@ -131,8 +135,8 @@ reportou sucesso por causa do modo recuperável padrão do UBSan.
 - Adicionados `clearMessagesBatcher()` e `Target::isGroup()`. A API
   `queueMessage()`/Target permanece; mensagens pendentes são liberadas no
   encerramento e após exceções. `initMessagesBatcher()` não descarta a fila.
-- Há uma única constante pública `k_invalidConnection`. CMake propaga C++26 e
-  os requisitos públicos GNS, com setup explícito de `import std` no consumidor.
+- Há uma única constante pública `k_invalidConnection`. CMake agora propaga C++17 e
+  os requisitos públicos GNS. O consumidor inclui os headers clássicos descritos em [Setup](setup.md).
 
 Não há decisão arquitetural pendente para as correções adotadas. As restrições
 de múltiplas instâncias, transporte próprio, callbacks e framing foram

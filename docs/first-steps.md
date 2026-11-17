@@ -1,5 +1,7 @@
 # First steps
 
+The examples use the C++17 types in [`lightnerx::compact`](compact.md) for byte views and error results.
+
 This guide shows the essential flow for setting up a server and a client. The examples use LightnerX components directly and leave the execution model to the application. The two programs illustrate separate consuming applications; the library remains a static library.
 
 ## Server
@@ -9,13 +11,18 @@ The server receives bytes from clients, forwards those bytes to `MessageInterpre
 ```cpp
 #include "steam/steamnetworkingtypes.h"
 
-import std;
+#include <cstddef>
+#include <cstdint>
+#include <iostream>
+#include <type_traits>
+#include <variant>
+#include <lightnerx/compact/span.hpp>
 
-import lightnerx.communication.intention;
-import lightnerx.communication.message;
-import lightnerx.communication.notification;
-import lightnerx.network.connection_manager;
-import lightnerx.network.server;
+#include <lightnerx/communication/intention.hpp>
+#include <lightnerx/communication/message.hpp>
+#include <lightnerx/communication/notification.hpp>
+#include <lightnerx/network/connection_manager.hpp>
+#include <lightnerx/network/server.hpp>
 
 int main() {
     lightnerx::network::Server server;
@@ -30,7 +37,7 @@ int main() {
             if (!connections.add(connection)) {
                 const auto disconnected = server.disconnectConnection(connection, false);
                 if (!disconnected) {
-                    std::println("Failed to disconnect: {}", disconnected.error().message());
+                    std::cout << "Failed to disconnect: " << disconnected.error().message() << '\n';
                 }
             }
         }
@@ -46,7 +53,7 @@ int main() {
 
     server.addClientReceivedMessageCallback(
         [&interpreter, &registry, &connections](
-            std::span<const std::byte> bytes,
+            lightnerx::compact::span<const std::byte> bytes,
             HSteamNetConnection connection
         ) {
             interpreter.obedientInterpret(
@@ -60,14 +67,13 @@ int main() {
 
     interpreter.addObedientInterpretedMessageCallback(
         [](lightnerx::communication::Message message, std::uint16_t clientId) {
-            std::println("Message received from client {}", clientId);
+            std::cout << "Message received from client " << clientId << '\n';
             std::visit([](const auto& header) {
-                using Header = std::remove_cvref_t<decltype(header)>;
+                using Header = std::remove_cv_t<std::remove_reference_t<decltype(header)>>;
                 if constexpr (std::is_same_v<Header, lightnerx::communication::Intention>) {
-                    std::println("Intention {}, correlation {}",
-                                 header.mbt.type, header.correlationId);
+                    std::cout << "Intention " << header.mbt.type << ", correlation " << header.correlationId << '\n';
                 } else if constexpr (std::is_same_v<Header, lightnerx::communication::Notification>) {
-                    std::println("Notification {}", header.mbt.type);
+                    std::cout << "Notification " << header.mbt.type << '\n';
                 }
             }, message.header);
         }
@@ -75,18 +81,19 @@ int main() {
 
     const auto started = server.start(45333, 2500);
     if (!started) {
-        std::println("Failed to start: {}", started.error().message());
+        std::cout << "Failed to start: " << started.error().message() << '\n';
         return 1;
     }
 
     while (true) {
         if (const auto updated = server.update(); !updated) {
-            std::println("Update failed: {}", updated.error().message());
+            std::cout << "Update failed: " << updated.error().message() << '\n';
             break;
         }
     }
 
     server.close();
+    return 1;
 }
 ```
 
@@ -101,19 +108,23 @@ The client forwards bytes received from the server to the `authorityInterpret` m
 ```cpp
 #include "steam/steamnetworkingtypes.h"
 
-import std;
+#include <cstddef>
+#include <iostream>
+#include <type_traits>
+#include <variant>
+#include <lightnerx/compact/span.hpp>
 
-import lightnerx.communication.event;
-import lightnerx.communication.message;
-import lightnerx.communication.response;
-import lightnerx.network.client;
+#include <lightnerx/communication/event.hpp>
+#include <lightnerx/communication/message.hpp>
+#include <lightnerx/communication/response.hpp>
+#include <lightnerx/network/client.hpp>
 
 int main() {
     lightnerx::network::Client client;
     lightnerx::communication::MessageInterpreter interpreter;
 
     client.addServerReceivedMessageCallback(
-        [&interpreter](std::span<const std::byte> bytes) {
+        [&interpreter](lightnerx::compact::span<const std::byte> bytes) {
             interpreter.authorityInterpret(bytes);
         }
     );
@@ -121,17 +132,16 @@ int main() {
     interpreter.addAuthorityInterpretedMessageCallback(
         [](lightnerx::communication::Message message) {
             std::visit([](const auto& header) {
-                using Header = std::remove_cvref_t<decltype(header)>;
+                using Header = std::remove_cv_t<std::remove_reference_t<decltype(header)>>;
                 if constexpr (std::is_same_v<Header, lightnerx::communication::Event>) {
-                    std::println("Event {}", header.mbt.type);
+                    std::cout << "Event " << header.mbt.type << '\n';
                 } else if constexpr (
                     std::is_same_v<Header, lightnerx::communication::Response> ||
                     std::is_same_v<Header, lightnerx::communication::UnsuccessfulResponse>
                 ) {
-                    std::println("Response to intention {}: status {}",
-                                 header.correlationId, header.status);
+                    std::cout << "Response to intention " << header.correlationId << ": status " << static_cast<unsigned>(header.status) << '\n';
                     if constexpr (std::is_same_v<Header, lightnerx::communication::UnsuccessfulResponse>) {
-                        std::println("Reason {}", header.reasonCode);
+                        std::cout << "Reason " << header.reasonCode << '\n';
                     }
                 }
             }, message.header);
@@ -139,22 +149,23 @@ int main() {
     );
 
     if (const auto started = client.start(); !started) {
-        std::println("Failed to start: {}", started.error().message());
+        std::cout << "Failed to start: " << started.error().message() << '\n';
         return 1;
     }
 
     if (const auto connected = client.connect("127.0.0.1", 45333);
         !connected) {
-        std::println("Failed to connect: {}", connected.error().message());
+        std::cout << "Failed to connect: " << connected.error().message() << '\n';
         return 1;
     }
 
     while (true) {
         if (const auto updated = client.update(1); !updated) {
-            std::println("Update failed: {}", updated.error().message());
+            std::cout << "Update failed: " << updated.error().message() << '\n';
             break;
         }
     }
+    return 1;
 }
 ```
 
@@ -170,7 +181,7 @@ Receive callbacks run during `update()`, and interpretation callbacks run on the
 
 ## Batch sending
 
-With the network initialized by `Server::start()`, `Client::start()`, or `lightnerx::network::networkInit()`, reserve space in the batcher before queuing the first message. Import `lightnerx.network.message_batch` and call:
+With the network initialized by `Server::start()`, `Client::start()`, or `lightnerx::network::networkInit()`, reserve space in the batcher before queuing the first message. Include `<lightnerx/network/message_batch.hpp>` and call:
 
 ```cpp
 lightnerx::network::initMessagesBatcher(64);
@@ -181,22 +192,28 @@ The destination is defined by `lightnerx::network::Target`. The following functi
 ```cpp
 #include "steam/steamnetworkingtypes.h"
 
-import std;
+#include <cstddef>
+#include <cstdint>
+#include <utility>
+#include <vector>
+#include <system_error>
+#include <lightnerx/compact/span.hpp>
+#include <lightnerx/compact/expected.hpp>
 
-import lightnerx.communication.event;
-import lightnerx.communication.message;
-import lightnerx.network.connection_manager;
-import lightnerx.network.message_batch;
-import lightnerx.network.target;
+#include <lightnerx/communication/event.hpp>
+#include <lightnerx/communication/message.hpp>
+#include <lightnerx/network/connection_manager.hpp>
+#include <lightnerx/network/message_batch.hpp>
+#include <lightnerx/network/target.hpp>
 
-std::expected<void, std::error_code> sendEventToGroup(
-    std::span<const std::byte> payload,
+lightnerx::compact::expected<void, std::error_code> sendEventToGroup(
+    lightnerx::compact::span<const std::byte> payload,
     std::vector<HSteamNetConnection> receivers,
     const lightnerx::network::ConnectionManager& connections
 ) {
     const auto totalSize = sizeof(lightnerx::communication::Event) + payload.size();
     if (totalSize > 0x7fff) {
-        return std::unexpected(std::make_error_code(std::errc::message_size));
+        return lightnerx::compact::unexpected(std::make_error_code(std::errc::message_size));
     }
 
     const lightnerx::communication::Event event{
