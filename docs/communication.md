@@ -1,5 +1,7 @@
 # Communication and the INER protocol
 
+The examples use the C++17 types in [`lightnerx::compact`](compact.md) for byte views and error results.
+
 ## INER and LightnerX
 
 INER is a semantic protocol. It defines the meaning and organization of messages, but does not define sockets, addressing, threads, or the transmission mechanism.
@@ -51,7 +53,7 @@ The payload, when present, follows the header.
 
 `Response` relates the result to an intention through `correlationId` and contains a `status`.
 
-The statuses are exposed by constants in the `lightnerx.communication.response` module:
+The statuses are exposed by constants in the `<lightnerx/communication/response.hpp>` header:
 
 | Constant | Value | Meaning | Type used by LightnerX |
 | --- | ---: | --- | --- |
@@ -79,8 +81,9 @@ The intention's payload follows this header.
 On the server, `NotificationRegistry` specifies which `type_id` values should be interpreted as `Notification`:
 
 ```cpp
-import std;
-import lightnerx.communication.notification;
+#include <unordered_set>
+#include <cstdint>
+#include <lightnerx/communication/notification.hpp>
 
 void registerNotifications(lightnerx::communication::NotificationRegistry& registry) {
     registry.registerId(47);
@@ -138,7 +141,7 @@ This internal ID belongs to the connection management implementation and is not 
 
 ## Network destinations
 
-`lightnerx::network::Target`, exported by the `lightnerx.network.target` module, defines where a queued message will be sent. The static factories create the destination description:
+`lightnerx::network::Target`, declared in the `<lightnerx/network/target.hpp>` header, defines where a queued message will be sent. The static factories create the destination description:
 
 | Factory | Destination |
 | --- | --- |
@@ -156,7 +159,7 @@ Network -> Server callback -> obedientInterpret -> application callback
 Network -> Client callback -> authorityInterpret -> application callback
 ```
 
-`MessageInterpreter` delivers a `lightnerx::communication::Message` whose `header` contains the concrete type in a `std::variant` and whose `payload` is a `std::span<const std::byte>`.
+`MessageInterpreter` delivers a `lightnerx::communication::Message` whose `header` contains the concrete type in a `std::variant` and whose `payload` is a `lightnerx::compact::span<const std::byte>`.
 
 Callbacks run during the interpretation call. The header is delivered by value, but the span only references the received bytes. In the flow with `Server` or `Client`, these bytes are released after the receive callbacks. To retain the payload, copy its bytes during the callback; copying only `Message` keeps a reference to the same buffer.
 
@@ -176,14 +179,20 @@ Example of an `Event` from the Authority with one byte of payload defined by the
 ```cpp
 #include "steam/steamnetworkingtypes.h"
 
-import std;
-import lightnerx.communication.event;
-import lightnerx.communication.message;
-import lightnerx.network.connection_manager;
-import lightnerx.network.message_batch;
-import lightnerx.network.target;
+#include <array>
+#include <cstddef>
+#include <cstdint>
+#include <utility>
+#include <vector>
+#include <system_error>
+#include <lightnerx/compact/expected.hpp>
+#include <lightnerx/communication/event.hpp>
+#include <lightnerx/communication/message.hpp>
+#include <lightnerx/network/connection_manager.hpp>
+#include <lightnerx/network/message_batch.hpp>
+#include <lightnerx/network/target.hpp>
 
-std::expected<void, std::error_code> broadcastEvent(
+lightnerx::compact::expected<void, std::error_code> broadcastEvent(
     const lightnerx::network::ConnectionManager& connections,
     std::vector<HSteamNetConnection> exceptions = {}
 ) {
@@ -209,7 +218,7 @@ std::expected<void, std::error_code> broadcastEvent(
 }
 ```
 
-Call `broadcastEvent(connections)` for everyone or `broadcastEvent(connections, {connectionToSkip})` to exclude a handle, checking the returned `std::expected`.
+Call `broadcastEvent(connections)` for everyone or `broadcastEvent(connections, {connectionToSkip})` to exclude a handle, checking the returned `lightnerx::compact::expected`.
 
 ### What each step does
 

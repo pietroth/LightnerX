@@ -101,6 +101,27 @@ set_tests_properties(lightnerx.consumer PROPERTIES
 
 add_subdirectory(compact)
 
+# Compile complete examples with their own includes and check API excerpts.
+file(GLOB documentation_pages CONFIGURE_DEPENDS "${PROJECT_SOURCE_DIR}/docs/*.md")
+list(APPEND documentation_pages "${PROJECT_SOURCE_DIR}/README.md")
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
+    ${documentation_pages} "${CMAKE_CURRENT_SOURCE_DIR}/documentation.py")
+execute_process(COMMAND ${Python3_EXECUTABLE} "${CMAKE_CURRENT_SOURCE_DIR}/documentation.py"
+    --output "${CMAKE_CURRENT_BINARY_DIR}/documentation"
+    RESULT_VARIABLE documentation_status OUTPUT_VARIABLE documentation_sources
+    OUTPUT_STRIP_TRAILING_WHITESPACE)
+if(NOT documentation_status EQUAL 0)
+    message(FATAL_ERROR "Documentation validation failed")
+endif()
+add_executable(lightnerx_test_documentation ${documentation_sources})
+target_link_libraries(lightnerx_test_documentation PRIVATE LightnerX)
+if(MSVC)
+    target_compile_options(lightnerx_test_documentation PRIVATE /UNDEBUG)
+else()
+    target_compile_options(lightnerx_test_documentation PRIVATE -UNDEBUG -pedantic-errors)
+endif()
+add_test(NAME lightnerx.documentation COMMAND lightnerx_test_documentation)
+
 # Each public header must compile as the first and only project include.
 file(GLOB_RECURSE lightnerx_public_headers CONFIGURE_DEPENDS
     "${PROJECT_SOURCE_DIR}/include/lightnerx/*.hpp")
@@ -109,7 +130,8 @@ foreach(header IN LISTS lightnerx_public_headers)
     file(RELATIVE_PATH include_name "${PROJECT_SOURCE_DIR}/include" "${header}")
     string(MAKE_C_IDENTIFIER "${include_name}" check_name)
     set(check_source "${CMAKE_CURRENT_BINARY_DIR}/headers/${check_name}.cpp")
-    file(WRITE "${check_source}" "#include <${include_name}>\n#include <${include_name}>\n")
+    file(CONFIGURE OUTPUT "${check_source}"
+        CONTENT "#include <${include_name}>\n#include <${include_name}>\n" @ONLY)
     list(APPEND header_checks "${check_source}")
 endforeach()
 add_library(lightnerx_header_checks OBJECT ${header_checks})

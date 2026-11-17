@@ -1,8 +1,10 @@
 ![LightnerX](docs/LightnerX%20Framed%20Wordmark.png)
 
-LightnerX is a modular static C++ library for building applications that communicate using the INER semantic protocol. The CMake project provides the `LightnerX` target; it neither produces nor requires its own executable. The library provides types for representing messages, interpreters, callbacks, connection management, and a transport layer based on GameNetworkingSockets.
+LightnerX is a static C++17 library for building applications that communicate using the INER semantic protocol. The CMake project provides the `LightnerX` target; it neither produces nor requires its own executable. The library provides types for representing messages, interpreters, callbacks, connection management, and a transport layer based on GameNetworkingSockets.
 
 INER defines the meaning of messages exchanged between an Authority and an Obedient. It does not define sockets, connections, or an execution model. These capabilities are provided by LightnerX's networking components and can be connected to the application according to the developer's needs.
+
+Build with CMake 4.5.0 or newer and a C++17 compiler. Public headers live under `include/lightnerx/`; byte views and results use the project’s own [`lightnerx::compact`](docs/compact.md) types. See [Setup](docs/setup.md) for dependencies and tested toolchains.
 
 ## Library, not a framework
 
@@ -12,7 +14,7 @@ LightnerX provides reusable components. The consuming application decides:
 - how to run `update()`;
 - which threads to use;
 - how to organize the connection lifecycle;
-- which modules to use or replace with its own implementations.
+- which components to use or replace with its own implementations.
 
 For example, you can pass one complete INER message from your own transport to `lightnerx::communication::MessageInterpreter`. `authorityInterpret` does not require a connection. `obedientInterpret` requires a `lightnerx::network::ConnectionManager` registration: `add()` accepts only live GNS handles, so arbitrary identifiers from another transport are not supported by that path. The manager stores its own mapping and does not use GNS connection userdata.
 
@@ -59,10 +61,12 @@ In LightnerX, the application connects components through callbacks: the network
 - [First steps](docs/first-steps.md)
 - [Communication and the INER protocol](docs/communication.md)
 - [API reference](docs/api.md)
+- [C++17 compact types](docs/compact.md)
+- [Migration and validation](docs/migration-cpp17.md)
 
 ## Server example
 
-This example receives notifications from the client and sends the text `Hello, World!` in events to registered connections. The snippets below make up the complete program at the end of the README; the statements belong inside the main function, after the imports shown in the complete code.
+This example receives notifications from the client and sends the text `Hello, World!` in events to registered connections. The snippets below make up the complete program at the end of the README; the statements belong inside the main function, after the includes shown in the complete code.
 
 ### Create the components
 
@@ -88,7 +92,7 @@ The callbacks keep the manager up to date. If registering a connection fails, th
 server.addClientConnectedCallback([&](HSteamNetConnection connection) {
     if (!connections.add(connection)) {
         if (const auto result = server.disconnectConnection(connection, false); !result) {
-            std::println("Failed to disconnect: {}", result.error().message());
+            std::cout << "Failed to disconnect: " << result.error().message() << '\n';
         }
     }
 });
@@ -106,17 +110,17 @@ Forward the received bytes to `obedientInterpret`. The interpreter's callback de
 
 ```cpp
 server.addClientReceivedMessageCallback(
-    [&](std::span<const std::byte> bytes, HSteamNetConnection connection) {
+    [&](lightnerx::compact::span<const std::byte> bytes, HSteamNetConnection connection) {
         interpreter.obedientInterpret(bytes, notifications, connection, connections);
     }
 );
 
 interpreter.addObedientInterpretedMessageCallback(
     [](communication::Message message, std::uint16_t clientId) {
-        const std::string_view text{
+        const auto text = message.payload.empty() ? std::string_view{} : std::string_view{
             reinterpret_cast<const char*>(message.payload.data()), message.payload.size()
         };
-        std::println("Client {}: {}", clientId, text);
+        std::cout << "Client " << clientId << ": " << text << '\n';
     }
 );
 ```
@@ -127,7 +131,7 @@ Start listening on port `41333`, with an established connection timeout of `3000
 
 ```cpp
 if (const auto result = server.start(41333, 3000); !result) {
-    std::println("Failed to start: {}", result.error().message());
+    std::cout << "Failed to start: " << result.error().message() << '\n';
     return 1;
 }
 network::initMessagesBatcher(1);
@@ -139,7 +143,7 @@ Convert the text to bytes and include the header and payload in the total size. 
 
 ```cpp
 const std::string_view greeting = "Hello, World!";
-const auto payload = std::as_bytes(std::span{greeting});
+const auto payload = lightnerx::compact::as_bytes(lightnerx::compact::span{greeting});
 const communication::Event event{
     // The least significant bit distinguishes Event from Response.
     static_cast<std::uint16_t>((sizeof(communication::Event) + payload.size()) << 1),
@@ -154,16 +158,16 @@ const communication::Event event{
 ```cpp
 while (true) {
     if (const auto result = server.update(); !result) {
-        std::println("Failed to update: {}", result.error().message());
+        std::cout << "Failed to update: " << result.error().message() << '\n';
         break;
     }
     if (const auto result = network::queueMessage(communication::event2OutboundMessage(
             event, payload, network::Target::broadcast())); !result) {
-        std::println("Failed to queue: {}", result.error().message());
+        std::cout << "Failed to queue: " << result.error().message() << '\n';
         break;
     }
     if (const auto result = network::flushAll(connections); !result) {
-        std::println("Failed to send: {}", result.error().message());
+        std::cout << "Failed to send: " << result.error().message() << '\n';
         break;
     }
     std::this_thread::sleep_for(3s);
@@ -204,7 +208,7 @@ communication::MessageInterpreter interpreter;
 Forward the bytes to `authorityInterpret`, which interprets messages from the Authority. The callback below prints the text payload agreed upon by these examples and handles empty payloads.
 
 ```cpp
-client.addServerReceivedMessageCallback([&](std::span<const std::byte> bytes) {
+client.addServerReceivedMessageCallback([&](lightnerx::compact::span<const std::byte> bytes) {
     interpreter.authorityInterpret(bytes);
 });
 
@@ -212,7 +216,7 @@ interpreter.addAuthorityInterpretedMessageCallback([](communication::Message mes
     const auto text = message.payload.empty() ? std::string_view{} : std::string_view{
         reinterpret_cast<const char*>(message.payload.data()), message.payload.size()
     };
-    std::println("Server: {}", text);
+    std::cout << "Server: " << text << '\n';
 });
 ```
 
@@ -224,11 +228,11 @@ Initialize the client, request a connection to the server, and reserve space in 
 
 ```cpp
 if (const auto result = client.start(); !result) {
-    std::println("Failed to start: {}", result.error().message());
+    std::cout << "Failed to start: " << result.error().message() << '\n';
     return 1;
 }
 if (const auto result = client.connect("127.0.0.1", 41333); !result) {
-    std::println("Failed to connect: {}", result.error().message());
+    std::cout << "Failed to connect: " << result.error().message() << '\n';
     return 1;
 }
 network::initMessagesBatcher(1);
@@ -240,7 +244,7 @@ network::initMessagesBatcher(1);
 
 ```cpp
 const std::string_view greeting = "Hello, World!";
-const auto payload = std::as_bytes(std::span{greeting});
+const auto payload = lightnerx::compact::as_bytes(lightnerx::compact::span{greeting});
 const communication::Notification notification{
     static_cast<std::uint16_t>(sizeof(communication::Notification) + payload.size()),
     47 // The server must register this ID in NotificationRegistry.
@@ -254,17 +258,17 @@ Process up to 32 messages per update and send when `isConnected()` indicates an 
 ```cpp
 while (true) {
     if (const auto result = client.update(32); !result) {
-        std::println("Failed to update: {}", result.error().message());
+        std::cout << "Failed to update: " << result.error().message() << '\n';
         break;
     }
     if (client.isConnected()) {
         if (const auto result = network::queueMessage(communication::notification2OutboundMessage(
                 notification, payload, network::Target::single(client.getServerHConn()))); !result) {
-            std::println("Failed to queue: {}", result.error().message());
+            std::cout << "Failed to queue: " << result.error().message() << '\n';
             break;
         }
         if (const auto result = network::flushAll(connections); !result) {
-            std::println("Failed to send: {}", result.error().message());
+            std::cout << "Failed to send: " << result.error().message() << '\n';
             break;
         }
     }
@@ -289,15 +293,21 @@ The programs below bring together the snippets presented above. The text payload
 ```cpp
 #include <steam/steamnetworkingtypes.h>
 
-import std;
+#include <chrono>
+#include <cstddef>
+#include <cstdint>
+#include <iostream>
+#include <string_view>
+#include <thread>
+#include <lightnerx/compact/span.hpp>
 
-import lightnerx.network.server;
-import lightnerx.network.connection_manager;
-import lightnerx.network.message_batch;
-import lightnerx.network.target;
-import lightnerx.communication.message;
-import lightnerx.communication.notification;
-import lightnerx.communication.event;
+#include <lightnerx/network/server.hpp>
+#include <lightnerx/network/connection_manager.hpp>
+#include <lightnerx/network/message_batch.hpp>
+#include <lightnerx/network/target.hpp>
+#include <lightnerx/communication/message.hpp>
+#include <lightnerx/communication/notification.hpp>
+#include <lightnerx/communication/event.hpp>
 
 int main() {
     using namespace std::chrono_literals;
@@ -313,7 +323,7 @@ int main() {
     server.addClientConnectedCallback([&](HSteamNetConnection connection) {
         if (!connections.add(connection)) {
             if (const auto result = server.disconnectConnection(connection, false); !result) {
-                std::println("Failed to disconnect: {}", result.error().message());
+                std::cout << "Failed to disconnect: " << result.error().message() << '\n';
             }
         }
     });
@@ -325,28 +335,28 @@ int main() {
     });
 
     server.addClientReceivedMessageCallback(
-        [&](std::span<const std::byte> bytes, HSteamNetConnection connection) {
+        [&](lightnerx::compact::span<const std::byte> bytes, HSteamNetConnection connection) {
             interpreter.obedientInterpret(bytes, notifications, connection, connections);
         }
     );
 
     interpreter.addObedientInterpretedMessageCallback(
         [](communication::Message message, std::uint16_t clientId) {
-            const std::string_view text{
+            const auto text = message.payload.empty() ? std::string_view{} : std::string_view{
                 reinterpret_cast<const char*>(message.payload.data()), message.payload.size()
             };
-            std::println("Client {}: {}", clientId, text);
+            std::cout << "Client " << clientId << ": " << text << '\n';
         }
     );
 
     if (const auto result = server.start(41333, 3000); !result) {
-        std::println("Failed to start: {}", result.error().message());
+        std::cout << "Failed to start: " << result.error().message() << '\n';
         return 1;
     }
     network::initMessagesBatcher(1);
 
     const std::string_view greeting = "Hello, World!";
-    const auto payload = std::as_bytes(std::span{greeting});
+    const auto payload = lightnerx::compact::as_bytes(lightnerx::compact::span{greeting});
     const communication::Event event{
         // The least significant bit distinguishes Event from Response.
         static_cast<std::uint16_t>((sizeof(communication::Event) + payload.size()) << 1),
@@ -355,16 +365,16 @@ int main() {
 
     while (true) {
         if (const auto result = server.update(); !result) {
-            std::println("Failed to update: {}", result.error().message());
+            std::cout << "Failed to update: " << result.error().message() << '\n';
             break;
         }
         if (const auto result = network::queueMessage(communication::event2OutboundMessage(
                 event, payload, network::Target::broadcast())); !result) {
-            std::println("Failed to queue: {}", result.error().message());
+            std::cout << "Failed to queue: " << result.error().message() << '\n';
             break;
         }
         if (const auto result = network::flushAll(connections); !result) {
-            std::println("Failed to send: {}", result.error().message());
+            std::cout << "Failed to send: " << result.error().message() << '\n';
             break;
         }
         std::this_thread::sleep_for(3s);
@@ -380,14 +390,20 @@ int main() {
 ```cpp
 #include <steam/steamnetworkingtypes.h>
 
-import std;
+#include <chrono>
+#include <cstddef>
+#include <cstdint>
+#include <iostream>
+#include <string_view>
+#include <thread>
+#include <lightnerx/compact/span.hpp>
 
-import lightnerx.network.client;
-import lightnerx.network.connection_manager;
-import lightnerx.network.message_batch;
-import lightnerx.network.target;
-import lightnerx.communication.message;
-import lightnerx.communication.notification;
+#include <lightnerx/network/client.hpp>
+#include <lightnerx/network/connection_manager.hpp>
+#include <lightnerx/network/message_batch.hpp>
+#include <lightnerx/network/target.hpp>
+#include <lightnerx/communication/message.hpp>
+#include <lightnerx/communication/notification.hpp>
 
 int main() {
     using namespace std::chrono_literals;
@@ -398,7 +414,7 @@ int main() {
     network::ConnectionManager connections{0, 0}; // Required by flush, without broadcast.
     communication::MessageInterpreter interpreter;
 
-    client.addServerReceivedMessageCallback([&](std::span<const std::byte> bytes) {
+    client.addServerReceivedMessageCallback([&](lightnerx::compact::span<const std::byte> bytes) {
         interpreter.authorityInterpret(bytes);
     });
 
@@ -406,21 +422,21 @@ int main() {
         const auto text = message.payload.empty() ? std::string_view{} : std::string_view{
             reinterpret_cast<const char*>(message.payload.data()), message.payload.size()
         };
-        std::println("Server: {}", text);
+        std::cout << "Server: " << text << '\n';
     });
 
     if (const auto result = client.start(); !result) {
-        std::println("Failed to start: {}", result.error().message());
+        std::cout << "Failed to start: " << result.error().message() << '\n';
         return 1;
     }
     if (const auto result = client.connect("127.0.0.1", 41333); !result) {
-        std::println("Failed to connect: {}", result.error().message());
+        std::cout << "Failed to connect: " << result.error().message() << '\n';
         return 1;
     }
     network::initMessagesBatcher(1);
 
     const std::string_view greeting = "Hello, World!";
-    const auto payload = std::as_bytes(std::span{greeting});
+    const auto payload = lightnerx::compact::as_bytes(lightnerx::compact::span{greeting});
     const communication::Notification notification{
         static_cast<std::uint16_t>(sizeof(communication::Notification) + payload.size()),
         47 // The server must register this ID in NotificationRegistry.
@@ -428,17 +444,17 @@ int main() {
 
     while (true) {
         if (const auto result = client.update(32); !result) {
-            std::println("Failed to update: {}", result.error().message());
+            std::cout << "Failed to update: " << result.error().message() << '\n';
             break;
         }
         if (client.isConnected()) {
             if (const auto result = network::queueMessage(communication::notification2OutboundMessage(
                     notification, payload, network::Target::single(client.getServerHConn()))); !result) {
-                std::println("Failed to queue: {}", result.error().message());
+                std::cout << "Failed to queue: " << result.error().message() << '\n';
                 break;
             }
             if (const auto result = network::flushAll(connections); !result) {
-                std::println("Failed to send: {}", result.error().message());
+                std::cout << "Failed to send: " << result.error().message() << '\n';
                 break;
             }
         }

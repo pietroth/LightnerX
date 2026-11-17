@@ -1,42 +1,43 @@
 # Setup
 
-LightnerX is a static C++ library. The project provides the `LightnerX` target and does not have its own executable.
+LightnerX is a static C++17 library. CMake provides the `LightnerX` target. The application supplies its own executable.
 
-## GameNetworkingSockets
+## Dependencies and toolchain
 
-GameNetworkingSockets is maintained as a submodule in `external/GameNetworkingSockets`. After obtaining the repository, run the following from the LightnerX root directory:
+Use CMake **4.5.0 or newer**, a C++17 compiler, and a build tool such as Ninja. CMake 4.5.0 was the latest stable release selected for this migration; CMake's version and the C++ language standard are independent requirements. Linux was validated with GCC 14.2 and Clang 19.1 in Debug and Release. GCC/libstdc++ 15.2 additionally validates the native comparison tests. Other platforms have not been validated by this migration.
+
+GameNetworkingSockets is pinned as a submodule in `external/GameNetworkingSockets`. Initialize it from the repository root:
 
 ```bash
 git submodule update --init --recursive
 ```
 
-This command retrieves GameNetworkingSockets and its recursive submodules in the state expected by LightnerX.
-
-## Toolchain and build
-
-LightnerX uses C++26 named modules and `import std`. The verified Linux toolchain
-is GCC 15.2 with its matching libstdc++, CMake 4.2.3 and Ninja 1.13.2. Install the
-GameNetworkingSockets prerequisites (including OpenSSL and Protobuf development
-packages and the Protobuf compiler) before configuring. Compilers and standard
-libraries without a C++26 `std` module are not supported by this configuration.
+Install OpenSSL and Protobuf development packages, the Protobuf compiler, and Python 3 when building tests. For example, on Debian 13:
 
 ```bash
-cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug
-cmake --build build --parallel 2
+sudo apt-get install g++-14 clang-19 ninja-build libssl-dev libprotobuf-dev protobuf-compiler python3-venv pkg-config
+python3 -m venv .venv
+.venv/bin/pip install cmake==4.5.0
+export PATH="$PWD/.venv/bin:$PATH"
 ```
+
+If dependencies live in a separate prefix, pass `-DCMAKE_PREFIX_PATH=/path/to/prefix` when configuring. The local validation used Protobuf 3.21.12, OpenSSL 3.6.5 and Ninja 1.13.2.
+
+## Build
+
+```bash
+cmake -S . -B build/debug -G Ninja -DCMAKE_BUILD_TYPE=Debug
+cmake --build build/debug --parallel 2
+```
+
+To select a compiler, pass `-DCMAKE_C_COMPILER=gcc-14 -DCMAKE_CXX_COMPILER=g++-14`, or `-DCMAKE_C_COMPILER=clang-19 -DCMAKE_CXX_COMPILER=clang++-19`, in a fresh build directory. Use `-DCMAKE_BUILD_TYPE=Release` for a release build.
 
 ## Consuming with CMake
 
-The `LightnerX` target propagates C++26, GameNetworkingSockets headers, compile
-definitions and link requirements. Consumers should link only that target.
-CMake's experimental `import std` support must be enabled **before the parent
-project's first `project()` call**. This gate is specific to CMake 4.2; consult the
-installed CMake documentation before changing CMake versions.
+The target propagates C++17, LightnerX headers, GameNetworkingSockets headers, compile definitions and link requirements. Consumers link `LightnerX`:
 
 ```cmake
-cmake_minimum_required(VERSION 4.2)
-set(CMAKE_EXPERIMENTAL_CXX_IMPORT_STD "d0edc3af-4c50-42ea-a356-e2862fe7a444")
-set(CMAKE_CXX_MODULE_STD ON)
+cmake_minimum_required(VERSION 4.5.0)
 set(CMAKE_CXX_EXTENSIONS OFF)
 project(MyGame LANGUAGES C CXX)
 
@@ -46,9 +47,7 @@ target_link_libraries(game PRIVATE LightnerX)
 ```
 
 ```cpp
-#include <steam/steamnetworkingsockets.h>
-import std;
-import lightnerx.network.client;
+#include <lightnerx/network/client.hpp>
 
 int main() {
     lightnerx::network::Client client;
@@ -56,15 +55,11 @@ int main() {
 }
 ```
 
-No prebuilt module binaries are distributed: the consumer and library must use
-compatible compiler, standard-library and module settings. The standalone
-`tests/consumer` project verifies this integration, including simultaneous imports
-of the client and transport modules.
+Use ordinary headers and sources with compatible compiler and standard-library ABIs. Each former module has a corresponding header, for example `<lightnerx/network/server.hpp>`, with definitions in `network/server.cpp`. The independent `tests/consumer` project checks propagated requirements and shared network/queue state across translation units. All public headers also compile in isolation.
 
-## Regression tests and sanitizers
+Byte views use `lightnerx::compact::span`, and results use `lightnerx::compact::expected`. These are LightnerX implementations of the C++20 `std::span` and C++23 `std::expected` contracts for C++17; see [compact types](compact.md) for supported operations and language limitations.
 
-The regression suite also requires Python 3 for deterministic fault-injection
-tests that compile the production implementation with a small transport mock.
+## Regression tests
 
 ```bash
 cmake -S . -B build/tests -G Ninja -DCMAKE_BUILD_TYPE=Debug -DLIGHTNERX_BUILD_TESTS=ON
@@ -72,30 +67,29 @@ cmake --build build/tests --parallel 2
 ctest --test-dir build/tests --output-on-failure
 ```
 
-With the tested GCC 15.2 toolchain, instrument the modules with AddressSanitizer:
+Tests include deterministic protocol characterization, routing and allocation failures, the complete client ID domain, callbacks, ownership, multi-file consumers, and the compact types. They also compile the documentation's C++ examples. Assertions remain enabled in Release. Network integration requires local UDP socket access; a build alone does not validate network behavior.
+
+To compare the compact types against the native standard types, use GCC/libstdc++ 15.2 and enable the separate reference executables:
+
+```bash
+cmake -S . -B build/native -G Ninja -DCMAKE_BUILD_TYPE=Debug \
+  -DLIGHTNERX_BUILD_TESTS=ON -DLIGHTNERX_BUILD_NATIVE_REFERENCE_TESTS=ON
+cmake --build build/native --parallel 2
+ctest --test-dir build/native --output-on-failure
+```
+
+Only these reference executables require C++20/23. LightnerX and the compact tests remain in C++17. A missing or incompatible native implementation fails the optional reference build; tests are not silently skipped. GCC 14's native expected implementation has an older conversion-to-boolean defect, so it is not the oracle for this comparison.
+
+For cross-version UDP tests, also pass `-DLIGHTNERX_REFERENCE_BINARY=/absolute/path/to/original/lightnerx_test_lifecycle`. CTest then pairs the old server with the new client and the new server with the old client. [Migration validation](migration-cpp17.md) identifies the original revision and build requirements. The [CI workflow](../.github/workflows/cpp17.yml) builds it separately.
+
+## Sanitizers
 
 ```bash
 cmake -S . -B build/sanitizers -G Ninja -DCMAKE_BUILD_TYPE=Debug \
-  -DLIGHTNERX_BUILD_TESTS=ON -DLIGHTNERX_SANITIZERS=address
+  -DLIGHTNERX_BUILD_TESTS=ON -DLIGHTNERX_SANITIZERS=address,undefined
 cmake --build build/sanitizers --parallel 2
-ctest --test-dir build/sanitizers --output-on-failure
+ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 \
+  ctest --test-dir build/sanitizers --output-on-failure
 ```
 
-This option instruments LightnerX and its consumers, including the tests; it does
-not instrument the standard-library module or third-party libraries. On a
-compatible compiler, `-DLIGHTNERX_SANITIZERS=address,undefined` enables both ASan
-and UBSan. GCC 15.2 hits an internal compiler error when compiling these modules
-with UBSan, even if `std` itself is not instrumented. The supplemental Python
-fault tests compile the production bodies without module declarations and run
-both sanitizers whenever `LIGHTNERX_SANITIZERS` is enabled; they supplement the
-real module tests rather than replacing them.
-
-Sanitizer diagnostics fail the test immediately. The lifecycle fault test links
-the real GNS library, which is built with `-fno-rtti`; only that supplemental test
-disables UBSan's `vptr` check. A raw GNS init/CreatePollGroup/Kill probe reproduces
-the incompatible check without using LightnerX. ASan and the other UBSan checks
-remain enabled. The allocation and ID mocks do not need this exclusion.
-
-Network integration tests require local UDP socket access. Restricted sandboxes
-may prevent those tests from completing; a build alone does not validate network
-behavior. Test assertions remain enabled in release configurations.
+This instruments LightnerX and its consumers, including tests. Dependencies are not rebuilt with sanitizer instrumentation. The pinned GameNetworkingSockets build disables RTTI, so GNS-linked targets disable only UBSan's `vptr` check. All other selected checks remain enabled, and independent compact and transport/allocation mock tests retain `vptr` checks as well. Fault-injection tests enable both ASan and UBSan when sanitizers are requested. Enabled sanitizer diagnostics fail tests immediately. LeakSanitizer may require execution outside a ptrace-restricted sandbox.
