@@ -1,6 +1,6 @@
 # Communication and the INER protocol
 
-The examples use `tcb::span` for byte views and `lightnerx::compact::expected` for results. See [C++17 byte views and results](cpp17-types.md).
+The examples use `tcb::span` for byte views and `zeus::expected` for results. See [C++17 byte views and results](cpp17-types.md).
 
 ## INER and LightnerX
 
@@ -196,14 +196,14 @@ Example of an `Event` from the Authority with one byte of payload defined by the
 #include <utility>
 #include <vector>
 #include <system_error>
-#include <lightnerx/compact/expected.hpp>
+#include <zeus/expected.hpp>
 #include <lightnerx/communication/event.hpp>
 #include <lightnerx/communication/message.hpp>
 #include <lightnerx/network/connection_manager.hpp>
 #include <lightnerx/network/message_batch.hpp>
 #include <lightnerx/network/target.hpp>
 
-lightnerx::compact::expected<void, std::error_code> broadcastEvent(
+zeus::expected<void, std::error_code> broadcastEvent(
     const lightnerx::network::ConnectionManager& connections,
     std::vector<HSteamNetConnection> exceptions = {}
 ) {
@@ -229,7 +229,7 @@ lightnerx::compact::expected<void, std::error_code> broadcastEvent(
 }
 ```
 
-Call `broadcastEvent(connections)` for everyone or `broadcastEvent(connections, {connectionToSkip})` to exclude a handle, checking the returned `lightnerx::compact::expected`.
+Call `broadcastEvent(connections)` for everyone or `broadcastEvent(connections, {connectionToSkip})` to exclude a handle, checking the returned `zeus::expected`.
 
 ### What each step does
 

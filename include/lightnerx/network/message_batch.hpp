@@ -3,7 +3,7 @@
 
 #include "steam/isteamnetworkingutils.h"
 #include <steam/steamnetworkingtypes.h>
-#include <lightnerx/compact/expected.hpp>
+#include <zeus/expected.hpp>
 #include <system_error>
 
 #include <lightnerx/network/transport.hpp>
@@ -18,8 +18,8 @@ namespace lightnerx::network {
     };
     void clearMessagesBatcher() noexcept;
     void initMessagesBatcher(int capacity);
-    lightnerx::compact::expected<void, std::error_code> queueMessage(OutboundMessage message);
-    lightnerx::compact::expected<void, std::error_code> flushAll(const ConnectionManager& connectionManager);
+    zeus::expected<void, std::error_code> queueMessage(OutboundMessage message);
+    zeus::expected<void, std::error_code> flushAll(const ConnectionManager& connectionManager);
 }
 
 #endif

@@ -3,7 +3,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <exception>
-#include <lightnerx/compact/expected.hpp>
+#include <zeus/expected.hpp>
 #include <memory>
 #include <system_error>
 #include <utility>
@@ -24,12 +24,12 @@ void Server::addClientReceivedMessageCallback(ClientReceivedMessageCallback call
     clientReceivedMessageCallbacks.push_back(callback);
 }
 
-lightnerx::compact::expected<void, std::error_code> Server::start(int port, uint32_t timeoutConnected) {
+zeus::expected<void, std::error_code> Server::start(int port, uint32_t timeoutConnected) {
     if (m_pInterface) {
-        return lightnerx::compact::unexpected(std::make_error_code(std::errc::operation_in_progress));
+        return zeus::unexpected(std::make_error_code(std::errc::operation_in_progress));
     }
     if (port < 1 || port > 65535 || timeoutConnected > INT32_MAX) {
-        return lightnerx::compact::unexpected(std::make_error_code(std::errc::invalid_argument));
+        return zeus::unexpected(std::make_error_code(std::errc::invalid_argument));
     }
     if (auto acquired = detail::acquireNetworkOwner(this); !acquired) return acquired;
 
@@ -63,25 +63,25 @@ lightnerx::compact::expected<void, std::error_code> Server::start(int port, uint
 
     if (m_hListenSocket == k_invalidSocket) {
         close();
-        return lightnerx::compact::unexpected(std::make_error_code(std::errc::resource_unavailable_try_again));
+        return zeus::unexpected(std::make_error_code(std::errc::resource_unavailable_try_again));
     }
 
     m_hPollGroup = m_pInterface->CreatePollGroup();
 
     if (m_hPollGroup == k_invalidPollGroup) {
         close();
-        return lightnerx::compact::unexpected(std::make_error_code(std::errc::resource_unavailable_try_again));
+        return zeus::unexpected(std::make_error_code(std::errc::resource_unavailable_try_again));
     }
 
     return {};
 }
 
-lightnerx::compact::expected<void, std::error_code> Server::update() {
+zeus::expected<void, std::error_code> Server::update() {
     if (!m_pInterface) {
-        return lightnerx::compact::unexpected(std::make_error_code(std::errc::not_connected));
+        return zeus::unexpected(std::make_error_code(std::errc::not_connected));
     }
     if (updating || activeCalls != 0) {
-        return lightnerx::compact::unexpected(std::make_error_code(std::errc::operation_in_progress));
+        return zeus::unexpected(std::make_error_code(std::errc::operation_in_progress));
     }
     ActiveCall active{*this};
     updating = true;
@@ -106,7 +106,7 @@ lightnerx::compact::expected<void, std::error_code> Server::update() {
     const auto release = [](ISteamNetworkingMessage* value) { if (value) value->Release(); };
     std::unique_ptr<ISteamNetworkingMessage, decltype(release)> ownedMessage(message, release);
     if (received < 0) {
-        return lightnerx::compact::unexpected(std::make_error_code(std::errc::io_error));
+        return zeus::unexpected(std::make_error_code(std::errc::io_error));
     }
 
     if (received > 0) {
@@ -124,11 +124,11 @@ lightnerx::compact::expected<void, std::error_code> Server::update() {
     return {};
 }
 
-lightnerx::compact::expected<void, std::error_code> Server::disconnectConnection(
+zeus::expected<void, std::error_code> Server::disconnectConnection(
             HSteamNetConnection hConn, bool enableLinger
         ) {
     if (!m_pInterface || closeRequested) {
-        return lightnerx::compact::unexpected(
+        return zeus::unexpected(
             std::make_error_code(std::errc::not_connected)
         );
     }
@@ -142,7 +142,7 @@ lightnerx::compact::expected<void, std::error_code> Server::disconnectConnection
         nullptr,
         enableLinger
     )) {
-        return lightnerx::compact::unexpected(
+        return zeus::unexpected(
             std::make_error_code(std::errc::io_error)
         );
     }

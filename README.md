@@ -13,7 +13,7 @@ LightnerX keeps client-server communication simple through a clear message model
 
 INER defines the meaning of messages exchanged between an Authority and an Obedient. It does not define sockets, connections, or an execution model. These capabilities are provided by LightnerX's networking components and can be connected to the application according to the developer's needs.
 
-Build with CMake 3.22 or newer and a C++17 compiler. Public headers live under `include/lightnerx/`. Byte views use `tcb::span` and results use `lightnerx::compact::expected`. See [Setup](docs/setup.md) for dependencies and tested toolchains.
+Build with CMake 3.22 or newer and a C++17 compiler. Public headers live under `include/lightnerx/`. Byte views use `tcb::span` and results use `zeus::expected`. See [Setup](docs/setup.md) for dependencies and tested toolchains.
 
 ## Library, not a framework
 

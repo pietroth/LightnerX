@@ -15,7 +15,6 @@ add_subdirectory(external/GameNetworkingSockets)
 
 add_library(LightnerX STATIC)
 target_compile_features(LightnerX PUBLIC cxx_std_17)
-target_sources(LightnerX PRIVATE include/lightnerx/compact/expected.hpp)
 
 set(LIGHTNERX_SANITIZERS "" CACHE STRING "Sanitizers for LightnerX and consumers, e.g. address or address,undefined")
 if(LIGHTNERX_SANITIZERS)
@@ -41,6 +40,7 @@ target_include_directories(LightnerX
 
 target_include_directories(LightnerX SYSTEM PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/external/span/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/external/expected/include
 )
 
 target_link_libraries(LightnerX

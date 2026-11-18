@@ -42,7 +42,7 @@ source = r'''
 #include <variant>
 #include <vector>
 #include <tcb/span.hpp>
-#include <lightnerx/compact/expected.hpp>
+#include <zeus/expected.hpp>
 #include <steam/steamnetworkingsockets.h>
 #include <steam/isteamnetworkingutils.h>
 int liveMessages = 0, clientReceive = 0, serverReceive = 0;

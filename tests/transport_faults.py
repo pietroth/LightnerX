@@ -20,7 +20,7 @@ source = r'''
 #include <utility>
 #include <vector>
 #include <tcb/span.hpp>
-#include <lightnerx/compact/expected.hpp>
+#include <zeus/expected.hpp>
 #include <steam/steamnetworkingsockets.h>
 std::vector<HSteamNetConnection> sent;
 bool initialized = true;

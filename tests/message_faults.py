@@ -42,7 +42,7 @@ source = r'''
 #include <variant>
 #include <vector>
 #include <tcb/span.hpp>
-#include <lightnerx/compact/expected.hpp>
+#include <zeus/expected.hpp>
 #include <steam/isteamnetworkingutils.h>
 bool failAllocation = false, throwSend = false;
 int liveMessages = 0;
@@ -77,14 +77,14 @@ namespace lightnerx::network {
         }
     };
     namespace detail { void setNetworkCleanup(void (*hook)() noexcept) { cleanupHook = hook; } }
-    lightnerx::compact::expected<void, std::error_code> sendToConnection(tcb::span<const std::byte>, HSteamNetConnection) {
+    zeus::expected<void, std::error_code> sendToConnection(tcb::span<const std::byte>, HSteamNetConnection) {
         if (throwSend && sendsBeforeThrow-- == 0) throw 23;
-        return lightnerx::compact::unexpected(std::make_error_code(std::errc::io_error));
+        return zeus::unexpected(std::make_error_code(std::errc::io_error));
     }
-    lightnerx::compact::expected<void, std::error_code> sendToConnections(tcb::span<const std::byte> data, std::vector<HSteamNetConnection>) {
+    zeus::expected<void, std::error_code> sendToConnections(tcb::span<const std::byte> data, std::vector<HSteamNetConnection>) {
         return sendToConnection(data, 0);
     }
-    lightnerx::compact::expected<void, std::error_code> broadcast(tcb::span<const std::byte> data, const ConnectionManager&, std::vector<HSteamNetConnection>) {
+    zeus::expected<void, std::error_code> broadcast(tcb::span<const std::byte> data, const ConnectionManager&, std::vector<HSteamNetConnection>) {
         return sendToConnection(data, 0);
     }
 }

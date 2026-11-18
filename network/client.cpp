@@ -1,7 +1,7 @@
 #include <lightnerx/network/client.hpp>
 
 #include <cstddef>
-#include <lightnerx/compact/expected.hpp>
+#include <zeus/expected.hpp>
 #include <tcb/span.hpp>
 #include <string>
 #include <string_view>
@@ -39,9 +39,9 @@ void Client::addServerReceivedMessageCallback(const ServerReceivedMessageCallbac
     serverReceivedMessageCallbacks.push_back(callback);
 }
 
-lightnerx::compact::expected<void, std::error_code> Client::start() {
+zeus::expected<void, std::error_code> Client::start() {
     if (m_sockets) {
-        return lightnerx::compact::unexpected(
+        return zeus::unexpected(
             std::make_error_code(std::errc::operation_in_progress)
         );
     }
@@ -53,7 +53,7 @@ lightnerx::compact::expected<void, std::error_code> Client::start() {
     if (!m_sockets) {
         detail::releaseNetworkOwner(this);
 
-        return lightnerx::compact::unexpected(
+        return zeus::unexpected(
             std::make_error_code(std::errc::io_error)
         );
     }
@@ -63,17 +63,17 @@ lightnerx::compact::expected<void, std::error_code> Client::start() {
     return {};
 }
 
-lightnerx::compact::expected<void, std::error_code> Client::connect(std::string_view ip, int port) {
+zeus::expected<void, std::error_code> Client::connect(std::string_view ip, int port) {
     if (!m_sockets) {
-        return lightnerx::compact::unexpected(std::make_error_code(std::errc::not_connected));
+        return zeus::unexpected(std::make_error_code(std::errc::not_connected));
     }
 
     if (m_connection != k_invalidConnection) {
-        return lightnerx::compact::unexpected(std::make_error_code(std::errc::already_connected));
+        return zeus::unexpected(std::make_error_code(std::errc::already_connected));
     }
 
     if (ip.empty() || port < 1 || port > 65535) {
-        return lightnerx::compact::unexpected(std::make_error_code(std::errc::invalid_argument));
+        return zeus::unexpected(std::make_error_code(std::errc::invalid_argument));
     }
 
     SteamNetworkingIPAddr address{};
@@ -81,7 +81,7 @@ lightnerx::compact::expected<void, std::error_code> Client::connect(std::string_
     const std::string ip_string{ip};
 
     if (!address.ParseString(ip_string.c_str())) {
-        return lightnerx::compact::unexpected(
+        return zeus::unexpected(
             std::make_error_code(std::errc::invalid_argument)
         );
     }
@@ -102,7 +102,7 @@ lightnerx::compact::expected<void, std::error_code> Client::connect(std::string_
     );
 
     if (m_connection == k_HSteamNetConnection_Invalid) {
-        return lightnerx::compact::unexpected(
+        return zeus::unexpected(
             std::make_error_code(std::errc::io_error)
         );
     }
@@ -110,13 +110,13 @@ lightnerx::compact::expected<void, std::error_code> Client::connect(std::string_
     return {};
 }
 
-lightnerx::compact::expected<void, std::error_code> Client::update(int maxMessagesToProcess) {
+zeus::expected<void, std::error_code> Client::update(int maxMessagesToProcess) {
     if (!m_sockets) {
-        return lightnerx::compact::unexpected(std::make_error_code(std::errc::not_connected));
+        return zeus::unexpected(std::make_error_code(std::errc::not_connected));
     }
 
     if (updating) {
-        return lightnerx::compact::unexpected(std::make_error_code(std::errc::operation_in_progress));
+        return zeus::unexpected(std::make_error_code(std::errc::operation_in_progress));
     }
     updating = true;
     struct UpdateGuard {
@@ -155,7 +155,7 @@ lightnerx::compact::expected<void, std::error_code> Client::update(int maxMessag
         const auto connection = std::exchange(m_connection, k_invalidConnection);
         connected = false;
         m_sockets->CloseConnection(connection, 0, nullptr, false);
-        return lightnerx::compact::unexpected(std::make_error_code(std::errc::io_error));
+        return zeus::unexpected(std::make_error_code(std::errc::io_error));
     }
     if (count == 0) {
         return {};
@@ -181,9 +181,9 @@ lightnerx::compact::expected<void, std::error_code> Client::update(int maxMessag
     return {};
 }
 
-lightnerx::compact::expected<void, std::error_code> Client::disconnect(bool enableLinger) {
+zeus::expected<void, std::error_code> Client::disconnect(bool enableLinger) {
     if (!m_sockets || m_connection == k_invalidConnection) {
-        return lightnerx::compact::unexpected(
+        return zeus::unexpected(
             std::make_error_code(std::errc::not_connected)
         );
     }
@@ -200,7 +200,7 @@ lightnerx::compact::expected<void, std::error_code> Client::disconnect(bool enab
         return {};
     }
 
-    return lightnerx::compact::unexpected(std::make_error_code(std::errc::io_error));
+    return zeus::unexpected(std::make_error_code(std::errc::io_error));
 }
 
 bool Client::isConnected() const noexcept {
