@@ -14,7 +14,10 @@ args = parser.parse_args()
 source = r'''
 #include <algorithm>
 #include <cassert>
+#include <cstddef>
+#include <cstdio>
 #include <cstdint>
+#include <limits>
 #include <optional>
 #include <system_error>
 #include <utility>
@@ -23,10 +26,19 @@ source = r'''
 #include <zeus/expected.hpp>
 #include <steam/steamnetworkingsockets.h>
 std::vector<HSteamNetConnection> sent;
+std::uint32_t lastSendSize = 0;
+std::optional<std::size_t> reportedMessageSize;
 bool initialized = true;
 int released = 0;
+
+// Exercise the transport's size conversion without allocating a large buffer.
+std::size_t transportMessageSize(tcb::span<const std::byte> message) {
+    return reportedMessageSize.value_or(message.size());
+}
+
 struct TestSockets {
-    EResult SendMessageToConnection(HSteamNetConnection handle, const void*, uint32_t, int, int64*) {
+    EResult SendMessageToConnection(HSteamNetConnection handle, const void*, uint32_t size, int, int64*) {
+        lastSendSize = size;
         sent.push_back(handle);
         return handle == 2 ? k_EResultFail : k_EResultOK;
     }
@@ -46,8 +58,11 @@ namespace lightnerx::network {
 }
 '''
 for path in ['network/target.cpp', 'network/transport.cpp', 'network/message_batch.cpp']:
-    source += '\n' + body(path).replace('ISteamNetworkingSockets*', 'TestSockets*').replace(
+    implementation = body(path).replace('ISteamNetworkingSockets*', 'TestSockets*').replace(
         'SteamNetworkingSockets()', 'injectedSockets()')
+    if path == 'network/transport.cpp':
+        implementation = implementation.replace('message.size()', 'transportMessageSize(message)')
+    source += '\n' + implementation
 source += r'''
 using namespace lightnerx::network;
 struct TestMessage : SteamNetworkingMessage_t {
@@ -60,6 +75,23 @@ struct TestMessage : SteamNetworkingMessage_t {
 };
 OutboundMessage outgoing(Target target) { return {new TestMessage, std::move(target)}; }
 int main() {
+    constexpr auto maxTransportSize = std::numeric_limits<std::uint32_t>::max();
+    reportedMessageSize = maxTransportSize;
+    if (!sendToConnection({}, 3) || lastSendSize != maxTransportSize) {
+        std::fputs("Maximum representable message size was not forwarded\n", stderr);
+        return 1;
+    }
+    sent.clear();
+    if constexpr (std::numeric_limits<std::size_t>::max() > maxTransportSize) {
+        reportedMessageSize = static_cast<std::size_t>(maxTransportSize) + 2;
+        const auto oversized = sendToConnection({}, 3);
+        if (oversized || oversized.error() != std::errc::message_size || !sent.empty()) {
+            std::fputs("Oversized message was not rejected before calling the transport\n", stderr);
+            return 1;
+        }
+    }
+    reportedMessageSize.reset();
+
     ConnectionManager connections{{0, 2, 3, 4}};
     const auto group = sendToConnections({}, {0, 2, 3});
     assert(!group && group.error() == std::errc::not_connected);

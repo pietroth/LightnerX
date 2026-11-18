@@ -402,7 +402,7 @@ zeus::expected<void, std::error_code> sendToConnection(
 );
 ```
 
-Forwards the bytes to GameNetworkingSockets with the reliable send option. The return value indicates whether the transport accepted the send. This function uses the transport directly, bypassing the batcher queue.
+Forwards the bytes to GameNetworkingSockets with the reliable send option. After checking the network and connection handle, the function returns `std::errc::message_size` if the byte count exceeds the transport's 32-bit length field. The return value indicates whether the transport accepted the send. This function uses the transport directly, bypassing the batcher queue.
 
 ### Sending to a group
 

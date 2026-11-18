@@ -30,7 +30,6 @@ int main() {
     if (client.getServerHConn() != network::k_invalidConnection) return 1;
     if (producerStateAddress() != &network::g_bNetworkInitialized) return 2;
     if (!network::networkInit()) return 3;
-    network::initMessagesBatcher(1);
     if (!queueFromProducer()) return 4;
     network::ConnectionManager connections(0, 0);
     // The invalid destination proves the other translation unit used this queue.
