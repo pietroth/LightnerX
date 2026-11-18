@@ -7,6 +7,10 @@ the module-era tests. The ordinary C++ tests link the unmodified library.
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
+INCLUDE_FLAGS = [
+    '-I' + str(ROOT / directory)
+    for directory in ('include', 'external/GameNetworkingSockets/include', 'external/span/include')
+]
 
 def body(path, *, steam=True):
     stem = Path(path).with_suffix('')

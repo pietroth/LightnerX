@@ -11,7 +11,7 @@
 #include <exception>
 #include <lightnerx/compact/expected.hpp>
 #include <functional>
-#include <lightnerx/compact/span.hpp>
+#include <tcb/span.hpp>
 #include <system_error>
 
 #include <lightnerx/network/network_manager.hpp>
@@ -44,7 +44,7 @@ namespace lightnerx::network {
         using ClientDisconnectedCallback = std::function<void(HSteamNetConnection)>;
         std::deque<ClientDisconnectedCallback> clientDisconnectedCallbacks;
 
-        using ClientReceivedMessageCallback = std::function<void(lightnerx::compact::span<const std::byte>, HSteamNetConnection)>;
+        using ClientReceivedMessageCallback = std::function<void(tcb::span<const std::byte>, HSteamNetConnection)>;
         std::deque<ClientReceivedMessageCallback> clientReceivedMessageCallbacks;
 
     public:

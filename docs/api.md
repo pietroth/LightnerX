@@ -2,7 +2,7 @@
 
 This page groups public components by header. Include the indicated header with `#include`; declarations belong to the indicated namespaces. Signature blocks are excerpts from class or namespace declarations, while usage blocks assume the objects described in their surrounding text.
 
-The library uses its own C++17 [compact types](compact.md): `lightnerx::compact::span` provides a non-owning view of contiguous elements, and `lightnerx::compact::expected` holds a value or an error.
+The library uses `tcb::span` for non-owning views of contiguous elements and `lightnerx::compact::expected` for values or errors. See [C++17 byte views and results](cpp17-types.md) for the headers and examples.
 
 Operations that return `lightnerx::compact::expected<void, std::error_code>` can be checked with `if (!result)`. In the event of an error, `result.error()` provides the code and `result.error().message()` provides its description. Complete examples are available in [First steps](first-steps.md).
 
@@ -159,7 +159,7 @@ struct Message {
         UnsuccessfulResponse,
         Notification
     > header;
-    lightnerx::compact::span<const std::byte> payload;
+    tcb::span<const std::byte> payload;
 };
 ```
 
@@ -187,7 +187,7 @@ The callback registered with `addAuthorityInterpretedMessageCallback` receives m
 
 ```cpp
 void obedientInterpret(
-    lightnerx::compact::span<const std::byte> data,
+    tcb::span<const std::byte> data,
     const NotificationRegistry& registry,
     HSteamNetConnection hConn,
     const lightnerx::network::ConnectionManager& connManager
@@ -199,7 +199,7 @@ Interprets messages sent by the Obedient. IDs found in the registry are treated 
 #### Interpretation on the client
 
 ```cpp
-void authorityInterpret(lightnerx::compact::span<const std::byte> data);
+void authorityInterpret(tcb::span<const std::byte> data);
 ```
 
 Interprets `Event` and responses sent by the Authority. The type bit selects event or response; the status selects `Response` or `UnsuccessfulResponse`. The approved and failure statuses deliver an empty payload; denial and partial approval deliver the bytes following `UnsuccessfulResponse`.
@@ -213,31 +213,31 @@ The functions below return `lightnerx::network::OutboundMessage`:
 ```cpp
 lightnerx::network::OutboundMessage event2OutboundMessage(
     const Event& event,
-    lightnerx::compact::span<const std::byte> payload,
+    tcb::span<const std::byte> payload,
     lightnerx::network::Target target
 );
 
 lightnerx::network::OutboundMessage intention2OutboundMessage(
     const Intention& intention,
-    lightnerx::compact::span<const std::byte> payload,
+    tcb::span<const std::byte> payload,
     lightnerx::network::Target target
 );
 
 lightnerx::network::OutboundMessage response2OutboundMessage(
     const Response& response,
-    lightnerx::compact::span<const std::byte> payload,
+    tcb::span<const std::byte> payload,
     lightnerx::network::Target target
 );
 
 lightnerx::network::OutboundMessage unsuccessfulResponse2OutboundMessage(
     const UnsuccessfulResponse& response,
-    lightnerx::compact::span<const std::byte> payload,
+    tcb::span<const std::byte> payload,
     lightnerx::network::Target target
 );
 
 lightnerx::network::OutboundMessage notification2OutboundMessage(
     const Notification& notification,
-    lightnerx::compact::span<const std::byte> payload,
+    tcb::span<const std::byte> payload,
     lightnerx::network::Target target
 );
 ```
@@ -283,7 +283,7 @@ void addClientDisconnectedCallback(
 
 void addClientReceivedMessageCallback(
     std::function<void(
-        lightnerx::compact::span<const std::byte>,
+        tcb::span<const std::byte>,
         HSteamNetConnection
     )> callback
 );
@@ -321,7 +321,7 @@ Client that connects to an IP address and processes messages from the connection
 
 ```cpp
 void addServerReceivedMessageCallback(
-    const std::function<void(lightnerx::compact::span<const std::byte>)>& callback
+    const std::function<void(tcb::span<const std::byte>)>& callback
 );
 
 lightnerx::compact::expected<void, std::error_code> start();
@@ -397,7 +397,7 @@ connections.forEach(
 
 ```cpp
 lightnerx::compact::expected<void, std::error_code> sendToConnection(
-    lightnerx::compact::span<const std::byte> message,
+    tcb::span<const std::byte> message,
     HSteamNetConnection hConn
 );
 ```
@@ -408,7 +408,7 @@ Forwards the bytes to GameNetworkingSockets with the reliable send option. The r
 
 ```cpp
 lightnerx::compact::expected<void, std::error_code> sendToConnections(
-    lightnerx::compact::span<const std::byte> message,
+    tcb::span<const std::byte> message,
     const std::vector<HSteamNetConnection> connections
 );
 ```
@@ -419,7 +419,7 @@ Forwards the same bytes to each handle in the vector. Attempts all destinations 
 
 ```cpp
 lightnerx::compact::expected<void, std::error_code> broadcast(
-    lightnerx::compact::span<const std::byte> message,
+    tcb::span<const std::byte> message,
     const lightnerx::network::ConnectionManager& connectionManager,
     const std::vector<HSteamNetConnection> exceptions
 );

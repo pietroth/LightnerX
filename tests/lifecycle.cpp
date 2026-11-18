@@ -6,7 +6,7 @@
 #include <cstddef>
 #include <exception>
 #include <iostream>
-#include <lightnerx/compact/span.hpp>
+#include <tcb/span.hpp>
 #include <stdexcept>
 #include <string>
 #include <string_view>
@@ -84,7 +84,7 @@ void runServer(int port) {
         connections.remove(*id);
         if (++disconnected == 3) server.close();
     });
-    server.addClientReceivedMessageCallback([&](lightnerx::compact::span<const std::byte> data, auto handle) {
+    server.addClientReceivedMessageCallback([&](tcb::span<const std::byte> data, auto handle) {
         check(server.update().error() == std::errc::operation_in_progress, "recursive server update");
         check(data.size() == 1 && (data[0] == std::byte{0x61} || data[0] == std::byte{0x62}), "server received payload");
         if (++received == 1) server.addClientReceivedMessageCallback([&](auto, auto) { ++addedReceiveCalls; });
@@ -124,7 +124,7 @@ void runServer(int port) {
 void runClient(int port) {
     Client client;
     int received = 0, addedCalls = 0;
-    client.addServerReceivedMessageCallback([&](lightnerx::compact::span<const std::byte> data) {
+    client.addServerReceivedMessageCallback([&](tcb::span<const std::byte> data) {
         check(client.update(1).error() == std::errc::operation_in_progress, "recursive client update");
         check(data.size() == 1 && data[0] == std::byte{0x61}, "client received payload");
         if (++received == 1) client.addServerReceivedMessageCallback([&](auto) { ++addedCalls; });

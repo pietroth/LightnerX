@@ -6,7 +6,7 @@ LightnerX is a static C++17 library. CMake provides the `LightnerX` target. The 
 
 Use CMake **3.22 or newer**, a C++17 compiler, and a build tool such as Ninja. CMake 3.22 is the minimum selected for compatibility with older development environments; CMake's version and the C++ language standard are independent requirements. Linux was validated with GCC 14.2 and Clang 19.1 in Debug and Release. GCC/libstdc++ 15.2 additionally validates the native comparison tests. Other platforms have not been validated by this migration.
 
-GameNetworkingSockets is pinned as a submodule in `external/GameNetworkingSockets`. Initialize it from the repository root:
+The pinned Git submodules are GameNetworkingSockets in `external/GameNetworkingSockets` and [tcbrindle/span](https://github.com/tcbrindle/span) in `external/span`. Initialize them from the repository root:
 
 ```bash
 git submodule update --init --recursive
@@ -40,7 +40,7 @@ To select a compiler, pass `-DCMAKE_C_COMPILER=gcc-14 -DCMAKE_CXX_COMPILER=g++-1
 
 ## Consuming with CMake
 
-The target propagates C++17, LightnerX headers, GameNetworkingSockets headers, compile definitions and link requirements. Consumers link `LightnerX`:
+The target propagates C++17, LightnerX and dependency headers, compile definitions and link requirements. Consumers link `LightnerX`:
 
 ```cmake
 cmake_minimum_required(VERSION 3.22)
@@ -63,7 +63,7 @@ int main() {
 
 Use ordinary headers and sources with compatible compiler and standard-library ABIs. Each former module has a corresponding header, for example `<lightnerx/network/server.hpp>`, with definitions in `network/server.cpp`. The independent `tests/consumer` project checks propagated requirements and shared network/queue state across translation units. All public headers also compile in isolation.
 
-Byte views use `lightnerx::compact::span`, and results use `lightnerx::compact::expected`. These are LightnerX implementations of the C++20 `std::span` and C++23 `std::expected` contracts for C++17; see [compact types](compact.md) for supported operations and language limitations.
+Byte views use `tcb::span` from `<tcb/span.hpp>` and results use `lightnerx::compact::expected`. See [C++17 byte views and results](cpp17-types.md) for examples.
 
 ## Regression tests
 
@@ -73,9 +73,9 @@ cmake --build build/tests --parallel 2
 ctest --test-dir build/tests --output-on-failure
 ```
 
-Tests include deterministic protocol characterization, routing and allocation failures, the complete client ID domain, callbacks, ownership, multi-file consumers, and the compact types. They also compile the documentation's C++ examples. Assertions remain enabled in Release. Network integration requires local UDP socket access; a build alone does not validate network behavior.
+Tests cover deterministic protocol characterization, routing and allocation failures, the complete client ID domain, callbacks, ownership, multi-file consumers, and compact expected. They also compile the documentation's C++ examples. Assertions remain enabled in Release. Network integration requires local UDP socket access.
 
-To compare the compact types against the native standard types, use GCC/libstdc++ 15.2 and enable the separate reference executables:
+To compare compact expected against the native standard type, use GCC/libstdc++ 15.2 and enable the separate reference executable:
 
 ```bash
 cmake -S . -B build/native -G Ninja -DCMAKE_BUILD_TYPE=Debug \
@@ -84,7 +84,7 @@ cmake --build build/native --parallel 2
 ctest --test-dir build/native --output-on-failure
 ```
 
-Only these reference executables require C++20/23. LightnerX and the compact tests remain in C++17. A missing or incompatible native implementation fails the optional reference build; tests are not silently skipped. GCC 14's native expected implementation has an older conversion-to-boolean defect, so it is not the oracle for this comparison.
+The native expected reference executable requires C++23. LightnerX and its compact expected tests use C++17. The comparison requires GCC/libstdc++ 15.2 for the expected conversion to boolean.
 
 For cross-version UDP tests, also pass `-DLIGHTNERX_REFERENCE_BINARY=/absolute/path/to/original/lightnerx_test_lifecycle`. CTest then pairs the old server with the new client and the new server with the old client. [Migration validation](migration-cpp17.md) identifies the original revision and build requirements. The [CI workflow](../.github/workflows/cpp17.yml) builds it separately.
 

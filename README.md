@@ -13,7 +13,7 @@ LightnerX keeps client-server communication simple through a clear message model
 
 INER defines the meaning of messages exchanged between an Authority and an Obedient. It does not define sockets, connections, or an execution model. These capabilities are provided by LightnerX's networking components and can be connected to the application according to the developer's needs.
 
-Build with CMake 3.22 or newer and a C++17 compiler. Public headers live under `include/lightnerx/`; byte views and results use the project’s own [`lightnerx::compact`](docs/compact.md) types. See [Setup](docs/setup.md) for dependencies and tested toolchains.
+Build with CMake 3.22 or newer and a C++17 compiler. Public headers live under `include/lightnerx/`. Byte views use `tcb::span` and results use `lightnerx::compact::expected`. See [Setup](docs/setup.md) for dependencies and tested toolchains.
 
 ## Library, not a framework
 
@@ -81,7 +81,7 @@ In LightnerX, the application connects components through callbacks: the network
 - [First steps](docs/first-steps.md)
 - [Communication and the INER protocol](docs/communication.md)
 - [API reference](docs/api.md)
-- [C++17 compact types](docs/compact.md)
+- [C++17 byte views and results](docs/cpp17-types.md)
 - [Migration and validation](docs/migration-cpp17.md)
 
 ## Server example
@@ -130,7 +130,7 @@ Forward the received bytes to `obedientInterpret`. The interpreter's callback de
 
 ```cpp
 server.addClientReceivedMessageCallback(
-    [&](lightnerx::compact::span<const std::byte> bytes, HSteamNetConnection connection) {
+    [&](tcb::span<const std::byte> bytes, HSteamNetConnection connection) {
         interpreter.obedientInterpret(bytes, notifications, connection, connections);
     }
 );
@@ -163,7 +163,7 @@ Convert the text to bytes and include the header and payload in the total size. 
 
 ```cpp
 const std::string_view greeting = "Hello, World!";
-const auto payload = lightnerx::compact::as_bytes(lightnerx::compact::span{greeting});
+const auto payload = tcb::as_bytes(tcb::span{greeting});
 const communication::Event event{
     // The least significant bit distinguishes Event from Response.
     static_cast<std::uint16_t>((sizeof(communication::Event) + payload.size()) << 1),
@@ -228,7 +228,7 @@ communication::MessageInterpreter interpreter;
 Forward the bytes to `authorityInterpret`, which interprets messages from the Authority. The callback below prints the text payload agreed upon by these examples and handles empty payloads.
 
 ```cpp
-client.addServerReceivedMessageCallback([&](lightnerx::compact::span<const std::byte> bytes) {
+client.addServerReceivedMessageCallback([&](tcb::span<const std::byte> bytes) {
     interpreter.authorityInterpret(bytes);
 });
 
@@ -264,7 +264,7 @@ network::initMessagesBatcher(1);
 
 ```cpp
 const std::string_view greeting = "Hello, World!";
-const auto payload = lightnerx::compact::as_bytes(lightnerx::compact::span{greeting});
+const auto payload = tcb::as_bytes(tcb::span{greeting});
 const communication::Notification notification{
     static_cast<std::uint16_t>(sizeof(communication::Notification) + payload.size()),
     47 // The server must register this ID in NotificationRegistry.
@@ -319,7 +319,7 @@ The programs below bring together the snippets presented above. The text payload
 #include <iostream>
 #include <string_view>
 #include <thread>
-#include <lightnerx/compact/span.hpp>
+#include <tcb/span.hpp>
 
 #include <lightnerx/network/server.hpp>
 #include <lightnerx/network/connection_manager.hpp>
@@ -355,7 +355,7 @@ int main() {
     });
 
     server.addClientReceivedMessageCallback(
-        [&](lightnerx::compact::span<const std::byte> bytes, HSteamNetConnection connection) {
+        [&](tcb::span<const std::byte> bytes, HSteamNetConnection connection) {
             interpreter.obedientInterpret(bytes, notifications, connection, connections);
         }
     );
@@ -376,7 +376,7 @@ int main() {
     network::initMessagesBatcher(1);
 
     const std::string_view greeting = "Hello, World!";
-    const auto payload = lightnerx::compact::as_bytes(lightnerx::compact::span{greeting});
+    const auto payload = tcb::as_bytes(tcb::span{greeting});
     const communication::Event event{
         // The least significant bit distinguishes Event from Response.
         static_cast<std::uint16_t>((sizeof(communication::Event) + payload.size()) << 1),
@@ -416,7 +416,7 @@ int main() {
 #include <iostream>
 #include <string_view>
 #include <thread>
-#include <lightnerx/compact/span.hpp>
+#include <tcb/span.hpp>
 
 #include <lightnerx/network/client.hpp>
 #include <lightnerx/network/connection_manager.hpp>
@@ -434,7 +434,7 @@ int main() {
     network::ConnectionManager connections{0, 0}; // Required by flush, without broadcast.
     communication::MessageInterpreter interpreter;
 
-    client.addServerReceivedMessageCallback([&](lightnerx::compact::span<const std::byte> bytes) {
+    client.addServerReceivedMessageCallback([&](tcb::span<const std::byte> bytes) {
         interpreter.authorityInterpret(bytes);
     });
 
@@ -456,7 +456,7 @@ int main() {
     network::initMessagesBatcher(1);
 
     const std::string_view greeting = "Hello, World!";
-    const auto payload = lightnerx::compact::as_bytes(lightnerx::compact::span{greeting});
+    const auto payload = tcb::as_bytes(tcb::span{greeting});
     const communication::Notification notification{
         static_cast<std::uint16_t>(sizeof(communication::Notification) + payload.size()),
         47 // The server must register this ID in NotificationRegistry.

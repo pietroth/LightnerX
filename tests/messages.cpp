@@ -10,7 +10,7 @@
 #include <iostream>
 #include <limits>
 #include <new>
-#include <lightnerx/compact/span.hpp>
+#include <tcb/span.hpp>
 #include <stdexcept>
 #include <variant>
 #include <vector>
@@ -89,7 +89,7 @@ int main() {
             interpreter.authorityInterpret(valid);
             require(authorityCount == before + 1, "valid authority message rejected");
             for (std::size_t size = 0; size < valid.size(); ++size)
-                interpreter.authorityInterpret(lightnerx::compact::span{valid}.first(size));
+                interpreter.authorityInterpret(tcb::span{valid}.first(size));
             auto bad = valid;
             setSize(bad, std::to_integer<unsigned>(valid[0]) & 1u);
             interpreter.authorityInterpret(bad);
@@ -105,7 +105,7 @@ int main() {
             interpreter.obedientInterpret(valid, registry, sender, manager);
             require(obedientCount == before + 1, "valid obedient message rejected");
             for (std::size_t size = 0; size < valid.size(); ++size)
-                interpreter.obedientInterpret(lightnerx::compact::span{valid}.first(size), registry, sender, manager);
+                interpreter.obedientInterpret(tcb::span{valid}.first(size), registry, sender, manager);
             auto bad = valid;
             setSize(bad, 0);
             interpreter.obedientInterpret(bad, registry, sender, manager);

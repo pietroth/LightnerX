@@ -2,7 +2,7 @@
 
 #include <cstddef>
 #include <lightnerx/compact/expected.hpp>
-#include <lightnerx/compact/span.hpp>
+#include <tcb/span.hpp>
 #include <string>
 #include <string_view>
 #include <system_error>
@@ -165,7 +165,7 @@ lightnerx::compact::expected<void, std::error_code> Client::update(int maxMessag
     for (int i = 0; i < count && m_connection == receivingConnection; ++i) {
         SteamNetworkingMessage_t* message = messages[i];
 
-        lightnerx::compact::span<const std::byte> convertedMessage{
+        tcb::span<const std::byte> convertedMessage{
             static_cast<const std::byte*>(message->m_pData),
             static_cast<std::size_t>(message->m_cbSize)
         };
