@@ -7,6 +7,15 @@
 #include <array>
 #include <lightnerx/network/server.hpp>
 
+namespace {
+struct ReserveMessageBatcher {
+    ReserveMessageBatcher() { lightnerx::network::initMessagesBatcher(1); }
+};
+
+// Reserve from a consumer translation unit before main().
+const ReserveMessageBatcher reserveMessageBatcher;
+}
+
 std::array<const void*, 8> producerConstantAddresses() {
     namespace communication = lightnerx::communication;
     return {&communication::APPROVED_RESPONSE, &communication::DENIED_RESPONSE,

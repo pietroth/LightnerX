@@ -27,16 +27,22 @@ namespace lightnerx::network {
         }
     };
 
-    MessageQueue pending;
+    namespace {
+        MessageQueue& pendingQueue() noexcept {
+            // A consumer can reserve space before main(), from another translation unit.
+            static MessageQueue queue;
+            return queue;
+        }
+    }
 
     void clearMessagesBatcher() noexcept {
-        pending.clear();
+        pendingQueue().clear();
     }
 
     void initMessagesBatcher(int capacity) {
         if (capacity < 0) throw std::invalid_argument("Negative batch capacity");
         detail::setNetworkCleanup(&clearMessagesBatcher);
-        pending.messages.reserve(static_cast<std::size_t>(capacity));
+        pendingQueue().messages.reserve(static_cast<std::size_t>(capacity));
     }
 
     zeus::expected<void, std::error_code> queueMessage(
@@ -47,12 +53,13 @@ namespace lightnerx::network {
             return zeus::unexpected(std::make_error_code(std::errc::invalid_argument));
         }
 
-        if (pending.messages.size() >= pending.messages.capacity()) {
+        auto& messages = pendingQueue().messages;
+        if (messages.size() >= messages.capacity()) {
             message.message->Release();
             return zeus::unexpected(std::make_error_code(std::errc::not_enough_memory));
         }
 
-        pending.messages.push_back(std::move(message));
+        messages.push_back(std::move(message));
         return {};
     }
 
@@ -64,7 +71,7 @@ namespace lightnerx::network {
         } releasePending;
         std::error_code lastError;
 
-        for (auto& message : pending.messages) {
+        for (auto& message : pendingQueue().messages) {
             tcb::span<const std::byte> data{
                 static_cast<const std::byte*>(message.message->m_pData),
                 static_cast<size_t>(message.message->m_cbSize)

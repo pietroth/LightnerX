@@ -4,6 +4,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <zeus/expected.hpp>
+#include <limits>
 #include <optional>
 #include <tcb/span.hpp>
 #include <system_error>
@@ -27,10 +28,15 @@ zeus::expected<void, std::error_code> sendToConnection(
         );
     }
 
+    const auto messageSize = message.size();
+    if (messageSize > std::numeric_limits<std::uint32_t>::max()) {
+        return zeus::unexpected(std::make_error_code(std::errc::message_size));
+    }
+
     EResult result = pInterface->SendMessageToConnection(
         hConn,
         message.data(),
-        static_cast<uint32_t>(message.size()),
+        static_cast<std::uint32_t>(messageSize),
         k_nSteamNetworkingSend_Reliable,
         nullptr
     );
