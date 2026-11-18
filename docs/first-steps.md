@@ -1,6 +1,6 @@
 # First steps
 
-The examples use the C++17 types in [`lightnerx::compact`](compact.md) for byte views and error results.
+The examples use `tcb::span` for byte views and `lightnerx::compact::expected` for results. See [C++17 byte views and results](cpp17-types.md).
 
 This guide shows the essential flow for setting up a server and a client. The examples use LightnerX components directly and leave the execution model to the application. The two programs illustrate separate consuming applications; the library remains a static library.
 
@@ -16,7 +16,7 @@ The server receives bytes from clients, forwards those bytes to `MessageInterpre
 #include <iostream>
 #include <type_traits>
 #include <variant>
-#include <lightnerx/compact/span.hpp>
+#include <tcb/span.hpp>
 
 #include <lightnerx/communication/intention.hpp>
 #include <lightnerx/communication/message.hpp>
@@ -53,7 +53,7 @@ int main() {
 
     server.addClientReceivedMessageCallback(
         [&interpreter, &registry, &connections](
-            lightnerx::compact::span<const std::byte> bytes,
+            tcb::span<const std::byte> bytes,
             HSteamNetConnection connection
         ) {
             interpreter.obedientInterpret(
@@ -112,7 +112,7 @@ The client forwards bytes received from the server to the `authorityInterpret` m
 #include <iostream>
 #include <type_traits>
 #include <variant>
-#include <lightnerx/compact/span.hpp>
+#include <tcb/span.hpp>
 
 #include <lightnerx/communication/event.hpp>
 #include <lightnerx/communication/message.hpp>
@@ -124,7 +124,7 @@ int main() {
     lightnerx::communication::MessageInterpreter interpreter;
 
     client.addServerReceivedMessageCallback(
-        [&interpreter](lightnerx::compact::span<const std::byte> bytes) {
+        [&interpreter](tcb::span<const std::byte> bytes) {
             interpreter.authorityInterpret(bytes);
         }
     );
@@ -197,7 +197,7 @@ The destination is defined by `lightnerx::network::Target`. The following functi
 #include <utility>
 #include <vector>
 #include <system_error>
-#include <lightnerx/compact/span.hpp>
+#include <tcb/span.hpp>
 #include <lightnerx/compact/expected.hpp>
 
 #include <lightnerx/communication/event.hpp>
@@ -207,7 +207,7 @@ The destination is defined by `lightnerx::network::Target`. The following functi
 #include <lightnerx/network/target.hpp>
 
 lightnerx::compact::expected<void, std::error_code> sendEventToGroup(
-    lightnerx::compact::span<const std::byte> payload,
+    tcb::span<const std::byte> payload,
     std::vector<HSteamNetConnection> receivers,
     const lightnerx::network::ConnectionManager& connections
 ) {

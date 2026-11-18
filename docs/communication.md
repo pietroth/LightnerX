@@ -1,6 +1,6 @@
 # Communication and the INER protocol
 
-The examples use the C++17 types in [`lightnerx::compact`](compact.md) for byte views and error results.
+The examples use `tcb::span` for byte views and `lightnerx::compact::expected` for results. See [C++17 byte views and results](cpp17-types.md).
 
 ## INER and LightnerX
 
@@ -170,7 +170,7 @@ Network -> Server callback -> obedientInterpret -> application callback
 Network -> Client callback -> authorityInterpret -> application callback
 ```
 
-`MessageInterpreter` delivers a `lightnerx::communication::Message` whose `header` contains the concrete type in a `std::variant` and whose `payload` is a `lightnerx::compact::span<const std::byte>`.
+`MessageInterpreter` delivers a `lightnerx::communication::Message` whose `header` contains the concrete type in a `std::variant` and whose `payload` is a `tcb::span<const std::byte>`.
 
 Callbacks run during the interpretation call. The header is delivered by value, but the span only references the received bytes. In the flow with `Server` or `Client`, these bytes are released after the receive callbacks. To retain the payload, copy its bytes during the callback; copying only `Message` keeps a reference to the same buffer.
 

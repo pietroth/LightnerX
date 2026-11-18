@@ -8,7 +8,7 @@ from pathlib import Path
 import shlex
 import subprocess
 import tempfile
-from source_support import body
+from source_support import INCLUDE_FLAGS, body
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--compiler', default='c++')
@@ -41,7 +41,7 @@ source = r'''
 #include <utility>
 #include <variant>
 #include <vector>
-#include <lightnerx/compact/span.hpp>
+#include <tcb/span.hpp>
 #include <lightnerx/compact/expected.hpp>
 #include <steam/steamnetworkingsockets.h>
 #include <steam/isteamnetworkingutils.h>
@@ -242,7 +242,7 @@ with tempfile.TemporaryDirectory(prefix='lightnerx-lifecycle-') as directory:
     executable = Path(directory) / 'lifecycle'
     cpp.write_text(source)
     command = [args.compiler, '-std=c++26' if args.baseline else '-std=c++17', *shlex.split(args.flags), '-g', '-O1',
-               '-I' + str(root / 'include'), '-I' + str(root / 'external/GameNetworkingSockets/include'), str(cpp),
+               *INCLUDE_FLAGS, str(cpp),
                str(args.library.resolve()), '-Wl,-rpath,' + str(args.library.resolve().parent), '-o', str(executable)]
     if args.sanitize:
         # The pinned GNS build uses -fno-rtti. UBSan vptr diagnoses even the

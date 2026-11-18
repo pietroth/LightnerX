@@ -2,7 +2,7 @@
 
 #include <cstddef>
 #include <lightnerx/compact/expected.hpp>
-#include <lightnerx/compact/span.hpp>
+#include <tcb/span.hpp>
 #include <stdexcept>
 #include <system_error>
 #include <utility>
@@ -65,7 +65,7 @@ namespace lightnerx::network {
         std::error_code lastError;
 
         for (auto& message : pending.messages) {
-            lightnerx::compact::span<const std::byte> data{
+            tcb::span<const std::byte> data{
                 static_cast<const std::byte*>(message.message->m_pData),
                 static_cast<size_t>(message.message->m_cbSize)
             };

@@ -5,14 +5,14 @@
 #include <cstdint>
 #include <lightnerx/compact/expected.hpp>
 #include <optional>
-#include <lightnerx/compact/span.hpp>
+#include <tcb/span.hpp>
 #include <system_error>
 #include <vector>
 
 namespace lightnerx::network {
 
 lightnerx::compact::expected<void, std::error_code> sendToConnection(
-        const lightnerx::compact::span<const std::byte> message,
+        const tcb::span<const std::byte> message,
         const HSteamNetConnection hConn
     ) {
     if (!lightnerx::network::isNetworkInitialized()) {
@@ -45,7 +45,7 @@ lightnerx::compact::expected<void, std::error_code> sendToConnection(
 }
 
 lightnerx::compact::expected<void, std::error_code> sendToConnections(
-        const lightnerx::compact::span<const std::byte> message,
+        const tcb::span<const std::byte> message,
         const std::vector<HSteamNetConnection> connections
     ) {
     std::optional<std::error_code> error;
@@ -66,7 +66,7 @@ lightnerx::compact::expected<void, std::error_code> sendToConnections(
 }
 
 lightnerx::compact::expected<void, std::error_code> broadcast(
-        const lightnerx::compact::span<const std::byte> message,
+        const tcb::span<const std::byte> message,
         const lightnerx::network::ConnectionManager& connectionManager,
         const std::vector<HSteamNetConnection> exceptions
     ) {

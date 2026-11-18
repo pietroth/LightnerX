@@ -2,3 +2,4 @@
 -Wall
 -Iinclude
 -Iexternal/GameNetworkingSockets/include
+-Iexternal/span/include

@@ -4,14 +4,13 @@ from pathlib import Path
 import shlex
 import subprocess
 import tempfile
-from source_support import body
+from source_support import INCLUDE_FLAGS, body
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--compiler', required=True)
 parser.add_argument('--flags', default='')
 parser.add_argument('--sanitize', action='store_true')
 args = parser.parse_args()
-root = Path(__file__).resolve().parents[1]
 source = r'''
 #include <algorithm>
 #include <cassert>
@@ -20,7 +19,7 @@ source = r'''
 #include <system_error>
 #include <utility>
 #include <vector>
-#include <lightnerx/compact/span.hpp>
+#include <tcb/span.hpp>
 #include <lightnerx/compact/expected.hpp>
 #include <steam/steamnetworkingsockets.h>
 std::vector<HSteamNetConnection> sent;
@@ -120,7 +119,7 @@ with tempfile.TemporaryDirectory(prefix='lightnerx-transport-') as directory:
     binary = Path(directory) / 'transport'
     cpp.write_text(source)
     command = [args.compiler, '-std=c++17', *shlex.split(args.flags), '-g', '-O1',
-               '-I' + str(root / 'include'), '-I' + str(root / 'external/GameNetworkingSockets/include'),
+               *INCLUDE_FLAGS,
                str(cpp), '-o', str(binary)]
     if args.sanitize:
         command += ['-fsanitize=address,undefined', '-fno-omit-frame-pointer', '-fno-sanitize-recover=all']

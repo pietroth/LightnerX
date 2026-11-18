@@ -9,7 +9,7 @@
 #include <exception>
 #include <lightnerx/compact/expected.hpp>
 #include <iostream>
-#include <lightnerx/compact/span.hpp>
+#include <tcb/span.hpp>
 #include <stdexcept>
 #include <system_error>
 #include <type_traits>
@@ -126,7 +126,7 @@ int main() {
         c::MessageInterpreter interpreter;
         interpreter.addAuthorityInterpretedMessageCallback([](c::Message message) { record(message, 0); });
         interpreter.addObedientInterpretedMessageCallback(record);
-        auto interpret = [&](lightnerx::compact::span<const std::byte> bytes) {
+        auto interpret = [&](tcb::span<const std::byte> bytes) {
             mix(++calls);
             interpreter.authorityInterpret(bytes);
             mix(++calls);
@@ -136,7 +136,7 @@ int main() {
         };
         for (auto frame : frames) {
             for (std::size_t length = 0; length <= frame.size(); ++length)
-                interpret(lightnerx::compact::span{frame}.first(length));
+                interpret(tcb::span{frame}.first(length));
             frame.push_back(std::byte{});
             interpret(frame);
         }

@@ -9,7 +9,7 @@
 #include <deque>
 #include <lightnerx/compact/expected.hpp>
 #include <functional>
-#include <lightnerx/compact/span.hpp>
+#include <tcb/span.hpp>
 #include <string_view>
 #include <system_error>
 
@@ -21,7 +21,7 @@ namespace lightnerx::network {
         bool connected = false;
         bool updating = false;
 
-        using ServerReceivedMessageCallback = std::function<void(lightnerx::compact::span<const std::byte>)>;
+        using ServerReceivedMessageCallback = std::function<void(tcb::span<const std::byte>)>;
         std::deque<ServerReceivedMessageCallback> serverReceivedMessageCallbacks;
 
         ISteamNetworkingSockets* m_sockets = nullptr;

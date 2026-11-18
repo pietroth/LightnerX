@@ -12,7 +12,7 @@
 #include <new>
 #include <optional>
 #include <iostream>
-#include <lightnerx/compact/span.hpp>
+#include <tcb/span.hpp>
 #include <stdexcept>
 #include <type_traits>
 #include <utility>
@@ -56,7 +56,7 @@ void check(bool condition, const char* description) {
 }
 
 void verifyMappings(const ConnectionManager& manager,
-                    lightnerx::compact::span<const HSteamNetConnection> handles,
+                    tcb::span<const HSteamNetConnection> handles,
                     std::initializer_list<Registration> expected) {
     check(manager.getOnlineCount() == static_cast<int>(expected.size()), "registration count changed");
     for (std::uint16_t id = 0; id <= handles.size(); ++id) {
@@ -78,7 +78,7 @@ void verifyMappings(const ConnectionManager& manager,
     check(visits == expected.size(), "enumeration count changed");
 }
 
-void assignmentRegression(lightnerx::compact::span<const HSteamNetConnection> handles) {
+void assignmentRegression(tcb::span<const HSteamNetConnection> handles) {
     ConnectionManager source(64, 6);
     for (std::uint16_t id = 1; id <= 4; ++id) {
         check(source.add(handles[id - 1]) == id, "source setup");

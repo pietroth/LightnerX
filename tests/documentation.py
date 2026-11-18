@@ -2,8 +2,8 @@
 
 Complete programs keep their own includes. Fragments use explicit application
 contexts, and API declarations are compared to the real types in unevaluated
-expressions. Network example loops are linked but are not run; compact examples
-run as part of the documentation executable.
+expressions. The documentation executable runs the byte view and result examples.
+Network example loops are compiled and linked separately.
 """
 import argparse
 from pathlib import Path
@@ -84,13 +84,13 @@ for index in [2, 3]:
     complete('communication.md', index)
 complete('setup.md', 0)
 for index in [0, 1]:
-    complete('compact.md', index, run=True)
+    complete('cpp17-types.md', index, run=True)
 
 context = '''
 int example(MessageInterpreter& interpreter, NotificationRegistry& registry,
             ConnectionManager& connections, HSteamNetConnection connection,
             HSteamNetConnection firstConnection, HSteamNetConnection secondConnection,
-            HSteamNetConnection connectionToSkip, lightnerx::compact::span<const std::byte> bytes) {
+            HSteamNetConnection connectionToSkip, tcb::span<const std::byte> bytes) {
     const auto payload = bytes;
     const Event event{static_cast<std::uint16_t>((sizeof(Event) + payload.size()) << 1), 47};
 '''
