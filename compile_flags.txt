@@ -3,3 +3,4 @@
 -Iinclude
 -Iexternal/GameNetworkingSockets/include
 -Iexternal/span/include
+-Iexternal/expected/include

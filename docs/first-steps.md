@@ -1,6 +1,6 @@
 # First steps
 
-The examples use `tcb::span` for byte views and `lightnerx::compact::expected` for results. See [C++17 byte views and results](cpp17-types.md).
+The examples use `tcb::span` for byte views and `zeus::expected` for results. See [C++17 byte views and results](cpp17-types.md).
 
 This guide shows the essential flow for setting up a server and a client. The examples use LightnerX components directly and leave the execution model to the application. The two programs illustrate separate consuming applications; the library remains a static library.
 
@@ -198,7 +198,7 @@ The destination is defined by `lightnerx::network::Target`. The following functi
 #include <vector>
 #include <system_error>
 #include <tcb/span.hpp>
-#include <lightnerx/compact/expected.hpp>
+#include <zeus/expected.hpp>
 
 #include <lightnerx/communication/event.hpp>
 #include <lightnerx/communication/message.hpp>
@@ -206,14 +206,14 @@ The destination is defined by `lightnerx::network::Target`. The following functi
 #include <lightnerx/network/message_batch.hpp>
 #include <lightnerx/network/target.hpp>
 
-lightnerx::compact::expected<void, std::error_code> sendEventToGroup(
+zeus::expected<void, std::error_code> sendEventToGroup(
     tcb::span<const std::byte> payload,
     std::vector<HSteamNetConnection> receivers,
     const lightnerx::network::ConnectionManager& connections
 ) {
     const auto totalSize = sizeof(lightnerx::communication::Event) + payload.size();
     if (totalSize > 0x7fff) {
-        return lightnerx::compact::unexpected(std::make_error_code(std::errc::message_size));
+        return zeus::unexpected(std::make_error_code(std::errc::message_size));
     }
 
     const lightnerx::communication::Event event{

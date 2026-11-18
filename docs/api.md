@@ -2,9 +2,9 @@
 
 This page groups public components by header. Include the indicated header with `#include`; declarations belong to the indicated namespaces. Signature blocks are excerpts from class or namespace declarations, while usage blocks assume the objects described in their surrounding text.
 
-The library uses `tcb::span` for non-owning views of contiguous elements and `lightnerx::compact::expected` for values or errors. See [C++17 byte views and results](cpp17-types.md) for the headers and examples.
+The library uses `tcb::span` for non-owning views of contiguous elements and `zeus::expected` for values or errors. See [C++17 byte views and results](cpp17-types.md) for the headers and examples.
 
-Operations that return `lightnerx::compact::expected<void, std::error_code>` can be checked with `if (!result)`. In the event of an error, `result.error()` provides the code and `result.error().message()` provides its description. Complete examples are available in [First steps](first-steps.md).
+Operations that return `zeus::expected<void, std::error_code>` can be checked with `if (!result)`. In the event of an error, `result.error()` provides the code and `result.error().message()` provides its description. Complete examples are available in [First steps](first-steps.md).
 
 ## `<lightnerx/communication/base_protocol.hpp>`
 
@@ -292,14 +292,14 @@ void addClientReceivedMessageCallback(
 #### Lifecycle
 
 ```cpp
-lightnerx::compact::expected<void, std::error_code> start(
+zeus::expected<void, std::error_code> start(
     int port,
     std::uint32_t timeoutConnected
 );
 
-lightnerx::compact::expected<void, std::error_code> update();
+zeus::expected<void, std::error_code> update();
 
-lightnerx::compact::expected<void, std::error_code> disconnectConnection(
+zeus::expected<void, std::error_code> disconnectConnection(
     HSteamNetConnection hConn,
     bool enableLinger
 );
@@ -324,18 +324,18 @@ void addServerReceivedMessageCallback(
     const std::function<void(tcb::span<const std::byte>)>& callback
 );
 
-lightnerx::compact::expected<void, std::error_code> start();
+zeus::expected<void, std::error_code> start();
 
-lightnerx::compact::expected<void, std::error_code> connect(
+zeus::expected<void, std::error_code> connect(
     std::string_view ip,
     int port
 );
 
-lightnerx::compact::expected<void, std::error_code> update(
+zeus::expected<void, std::error_code> update(
     int maxMessagesToProcess
 );
 
-lightnerx::compact::expected<void, std::error_code> disconnect(
+zeus::expected<void, std::error_code> disconnect(
     bool enableLinger
 );
 
@@ -396,7 +396,7 @@ connections.forEach(
 ### Direct sending
 
 ```cpp
-lightnerx::compact::expected<void, std::error_code> sendToConnection(
+zeus::expected<void, std::error_code> sendToConnection(
     tcb::span<const std::byte> message,
     HSteamNetConnection hConn
 );
@@ -407,7 +407,7 @@ Forwards the bytes to GameNetworkingSockets with the reliable send option. The r
 ### Sending to a group
 
 ```cpp
-lightnerx::compact::expected<void, std::error_code> sendToConnections(
+zeus::expected<void, std::error_code> sendToConnections(
     tcb::span<const std::byte> message,
     const std::vector<HSteamNetConnection> connections
 );
@@ -418,7 +418,7 @@ Forwards the same bytes to each handle in the vector. Attempts all destinations 
 ### Broadcast
 
 ```cpp
-lightnerx::compact::expected<void, std::error_code> broadcast(
+zeus::expected<void, std::error_code> broadcast(
     tcb::span<const std::byte> message,
     const lightnerx::network::ConnectionManager& connectionManager,
     const std::vector<HSteamNetConnection> exceptions
@@ -489,9 +489,9 @@ struct OutboundMessage {
 void initMessagesBatcher(int capacity);
 void clearMessagesBatcher() noexcept;
 
-lightnerx::compact::expected<void, std::error_code> queueMessage(OutboundMessage message);
+zeus::expected<void, std::error_code> queueMessage(OutboundMessage message);
 
-lightnerx::compact::expected<void, std::error_code> flushAll(
+zeus::expected<void, std::error_code> flushAll(
     const ConnectionManager& connectionManager
 );
 ```

@@ -3,7 +3,7 @@
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
-#include <lightnerx/compact/expected.hpp>
+#include <zeus/expected.hpp>
 #include <optional>
 #include <tcb/span.hpp>
 #include <system_error>
@@ -11,18 +11,18 @@
 
 namespace lightnerx::network {
 
-lightnerx::compact::expected<void, std::error_code> sendToConnection(
+zeus::expected<void, std::error_code> sendToConnection(
         const tcb::span<const std::byte> message,
         const HSteamNetConnection hConn
     ) {
     if (!lightnerx::network::isNetworkInitialized()) {
-        return lightnerx::compact::unexpected(std::make_error_code(std::errc::resource_unavailable_try_again));
+        return zeus::unexpected(std::make_error_code(std::errc::resource_unavailable_try_again));
     }
 
     ISteamNetworkingSockets* pInterface = SteamNetworkingSockets();
 
     if (!pInterface || hConn == k_invalidConnection) {
-        return lightnerx::compact::unexpected(
+        return zeus::unexpected(
             std::make_error_code(std::errc::not_connected)
         );
     }
@@ -39,12 +39,12 @@ lightnerx::compact::expected<void, std::error_code> sendToConnection(
         return {};
     }
 
-    return lightnerx::compact::unexpected(
+    return zeus::unexpected(
         std::make_error_code(std::errc::io_error)
     );
 }
 
-lightnerx::compact::expected<void, std::error_code> sendToConnections(
+zeus::expected<void, std::error_code> sendToConnections(
         const tcb::span<const std::byte> message,
         const std::vector<HSteamNetConnection> connections
     ) {
@@ -59,13 +59,13 @@ lightnerx::compact::expected<void, std::error_code> sendToConnections(
     }
 
     if (error) {
-        return lightnerx::compact::unexpected(*error);
+        return zeus::unexpected(*error);
     }
 
     return {};
 }
 
-lightnerx::compact::expected<void, std::error_code> broadcast(
+zeus::expected<void, std::error_code> broadcast(
         const tcb::span<const std::byte> message,
         const lightnerx::network::ConnectionManager& connectionManager,
         const std::vector<HSteamNetConnection> exceptions
@@ -85,7 +85,7 @@ lightnerx::compact::expected<void, std::error_code> broadcast(
     });
 
     if (error) {
-        return lightnerx::compact::unexpected(*error);
+        return zeus::unexpected(*error);
     }
 
     return {};

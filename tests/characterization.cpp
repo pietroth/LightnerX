@@ -7,7 +7,7 @@
 #include <cstdint>
 #include <cstring>
 #include <exception>
-#include <lightnerx/compact/expected.hpp>
+#include <zeus/expected.hpp>
 #include <iostream>
 #include <tcb/span.hpp>
 #include <stdexcept>
@@ -76,7 +76,7 @@ std::vector<std::byte> wire(const char* name, n::OutboundMessage outbound) {
     return result;
 }
 
-void error(const char* name, lightnerx::compact::expected<void, std::error_code> result) {
+void error(const char* name, zeus::expected<void, std::error_code> result) {
     std::cout << name << '=' << (result ? 0 : result.error().value()) << '\n';
 }
 }

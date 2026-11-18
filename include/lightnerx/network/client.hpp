@@ -7,7 +7,7 @@
 #include <steam/isteamnetworkingutils.h>
 #include <cstddef>
 #include <deque>
-#include <lightnerx/compact/expected.hpp>
+#include <zeus/expected.hpp>
 #include <functional>
 #include <tcb/span.hpp>
 #include <string_view>
@@ -40,13 +40,13 @@ namespace lightnerx::network {
 
         void addServerReceivedMessageCallback(const ServerReceivedMessageCallback& callback);
 
-        lightnerx::compact::expected<void, std::error_code> start();
+        zeus::expected<void, std::error_code> start();
 
-        lightnerx::compact::expected<void, std::error_code> connect(std::string_view ip, int port);
+        zeus::expected<void, std::error_code> connect(std::string_view ip, int port);
 
-        lightnerx::compact::expected<void, std::error_code> update(int maxMessagesToProcess);
+        zeus::expected<void, std::error_code> update(int maxMessagesToProcess);
 
-        lightnerx::compact::expected<void, std::error_code> disconnect(bool enableLinger);
+        zeus::expected<void, std::error_code> disconnect(bool enableLinger);
 
         bool isConnected() const noexcept;
 

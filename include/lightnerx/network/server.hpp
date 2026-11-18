@@ -9,7 +9,7 @@
 #include <cstdint>
 #include <deque>
 #include <exception>
-#include <lightnerx/compact/expected.hpp>
+#include <zeus/expected.hpp>
 #include <functional>
 #include <tcb/span.hpp>
 #include <system_error>
@@ -61,11 +61,11 @@ namespace lightnerx::network {
 
         void addClientReceivedMessageCallback(ClientReceivedMessageCallback callback);
 
-        lightnerx::compact::expected<void, std::error_code> start(int port, uint32_t timeoutConnected);
+        zeus::expected<void, std::error_code> start(int port, uint32_t timeoutConnected);
 
-        lightnerx::compact::expected<void, std::error_code> update();
+        zeus::expected<void, std::error_code> update();
 
-        lightnerx::compact::expected<void, std::error_code> disconnectConnection(
+        zeus::expected<void, std::error_code> disconnectConnection(
             HSteamNetConnection hConn, bool enableLinger
         );
 

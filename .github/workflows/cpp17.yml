@@ -90,7 +90,7 @@ jobs:
           build/cmake-reference/bin/cmake -S build/reference -B build/reference-build -G Ninja -DCMAKE_BUILD_TYPE=Debug -DLIGHTNERX_BUILD_TESTS=ON
           build/cmake-reference/bin/cmake --build build/reference-build --parallel 2
           build/cmake-reference/bin/ctest --test-dir build/reference-build --output-on-failure --output-junit results.xml --output-log build/reference-build/tests.log
-      - name: Compare expected implementations and original wire behavior
+      - name: Compare C++17 with original wire behavior
         shell: micromamba-shell {0}
         run: |
           export CMAKE_PREFIX_PATH="$CONDA_PREFIX"
@@ -100,7 +100,7 @@ jobs:
           python -m venv build/cmake-minimum
           build/cmake-minimum/bin/pip install cmake==3.22.0
           export PATH="$PWD/build/cmake-minimum/bin:$PATH"
-          cmake -S . -B build/native -G Ninja -DCMAKE_BUILD_TYPE=Debug -DLIGHTNERX_BUILD_TESTS=ON -DLIGHTNERX_BUILD_NATIVE_REFERENCE_TESTS=ON -DLIGHTNERX_REFERENCE_BINARY="$PWD/build/reference-build/tests/lightnerx_test_lifecycle"
+          cmake -S . -B build/native -G Ninja -DCMAKE_BUILD_TYPE=Debug -DLIGHTNERX_BUILD_TESTS=ON -DLIGHTNERX_REFERENCE_BINARY="$PWD/build/reference-build/tests/lightnerx_test_lifecycle"
           cmake --build build/native --parallel 2
           ctest --test-dir build/native --output-on-failure --output-junit results.xml --output-log build/native/tests.log
       - uses: actions/upload-artifact@v4

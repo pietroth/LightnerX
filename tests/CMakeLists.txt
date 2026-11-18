@@ -99,8 +99,6 @@ set_tests_properties(lightnerx.consumer PROPERTIES
     ENVIRONMENT "CMAKE_BUILD_PARALLEL_LEVEL=2"
 )
 
-add_subdirectory(compact)
-
 # Compile complete examples with their own includes and check API excerpts.
 file(GLOB documentation_pages CONFIGURE_DEPENDS "${PROJECT_SOURCE_DIR}/docs/*.md")
 list(APPEND documentation_pages "${PROJECT_SOURCE_DIR}/README.md")

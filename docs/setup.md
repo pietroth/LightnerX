@@ -4,9 +4,17 @@ LightnerX is a static C++17 library. CMake provides the `LightnerX` target. The 
 
 ## Dependencies and toolchain
 
-Use CMake **3.22 or newer**, a C++17 compiler, and a build tool such as Ninja. CMake 3.22 is the minimum selected for compatibility with older development environments; CMake's version and the C++ language standard are independent requirements. Linux was validated with GCC 14.2 and Clang 19.1 in Debug and Release. GCC/libstdc++ 15.2 additionally validates the native comparison tests. Other platforms have not been validated by this migration.
+Use CMake **3.22 or newer**, a C++17 compiler, and a build tool such as Ninja. The CI matrix builds with GCC 14 and Clang 19 on Linux in Debug and Release.
 
-The pinned Git submodules are GameNetworkingSockets in `external/GameNetworkingSockets` and [tcbrindle/span](https://github.com/tcbrindle/span) in `external/span`. Initialize them from the repository root:
+LightnerX uses three pinned Git submodules.
+
+| Dependency | Path |
+| --- | --- |
+| [GameNetworkingSockets](https://github.com/ValveSoftware/GameNetworkingSockets) | `external/GameNetworkingSockets` |
+| [tcbrindle/span](https://github.com/tcbrindle/span/tree/836dc6a0efd9849cb194e88e4aa2387436bb079b) | `external/span` |
+| [zeus-cpp/expected v1.4.0](https://github.com/zeus-cpp/expected/tree/v1.4.0) | `external/expected` |
+
+Initialize or update them from the repository root.
 
 ```bash
 git submodule update --init --recursive
@@ -27,7 +35,7 @@ python3 -m venv .venv
 export PATH="$PWD/.venv/bin:$PATH"
 ```
 
-If dependencies live in a separate prefix, pass `-DCMAKE_PREFIX_PATH=/path/to/prefix` when configuring. The local validation used Protobuf 3.21.12, OpenSSL 3.6.5 and Ninja 1.13.2.
+If dependencies live in a separate prefix, pass `-DCMAKE_PREFIX_PATH=/path/to/prefix` when configuring.
 
 ## Build
 
@@ -63,7 +71,7 @@ int main() {
 
 Use ordinary headers and sources with compatible compiler and standard-library ABIs. Each former module has a corresponding header, for example `<lightnerx/network/server.hpp>`, with definitions in `network/server.cpp`. The independent `tests/consumer` project checks propagated requirements and shared network/queue state across translation units. All public headers also compile in isolation.
 
-Byte views use `tcb::span` from `<tcb/span.hpp>` and results use `lightnerx::compact::expected`. See [C++17 byte views and results](cpp17-types.md) for examples.
+Byte views use `tcb::span` from `<tcb/span.hpp>` and results use `zeus::expected` from `<zeus/expected.hpp>`. Both dependencies are header-only and available to consumers through the `LightnerX` target. See [C++17 byte views and results](cpp17-types.md) for examples.
 
 ## Regression tests
 
@@ -73,18 +81,7 @@ cmake --build build/tests --parallel 2
 ctest --test-dir build/tests --output-on-failure
 ```
 
-Tests cover deterministic protocol characterization, routing and allocation failures, the complete client ID domain, callbacks, ownership, multi-file consumers, and compact expected. They also compile the documentation's C++ examples. Assertions remain enabled in Release. Network integration requires local UDP socket access.
-
-To compare compact expected against the native standard type, use GCC/libstdc++ 15.2 and enable the separate reference executable:
-
-```bash
-cmake -S . -B build/native -G Ninja -DCMAKE_BUILD_TYPE=Debug \
-  -DLIGHTNERX_BUILD_TESTS=ON -DLIGHTNERX_BUILD_NATIVE_REFERENCE_TESTS=ON
-cmake --build build/native --parallel 2
-ctest --test-dir build/native --output-on-failure
-```
-
-The native expected reference executable requires C++23. LightnerX and its compact expected tests use C++17. The comparison requires GCC/libstdc++ 15.2 for the expected conversion to boolean.
+Tests cover deterministic protocol characterization, routing and allocation failures, the complete client ID domain, callbacks, ownership and multi-file consumers. They also compile the documentation's C++ examples. Assertions remain enabled in Release. Network integration requires local UDP socket access.
 
 For cross-version UDP tests, also pass `-DLIGHTNERX_REFERENCE_BINARY=/absolute/path/to/original/lightnerx_test_lifecycle`. CTest then pairs the old server with the new client and the new server with the old client. [Migration validation](migration-cpp17.md) identifies the original revision and build requirements. The [CI workflow](../.github/workflows/cpp17.yml) builds it separately.
 
@@ -98,4 +95,4 @@ ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 \
   ctest --test-dir build/sanitizers --output-on-failure
 ```
 
-This instruments LightnerX and its consumers, including tests. Dependencies are not rebuilt with sanitizer instrumentation. The pinned GameNetworkingSockets build disables RTTI, so GNS-linked targets disable only UBSan's `vptr` check. All other selected checks remain enabled, and independent compact and transport/allocation mock tests retain `vptr` checks as well. Fault-injection tests enable both ASan and UBSan when sanitizers are requested. Enabled sanitizer diagnostics fail tests immediately. LeakSanitizer may require execution outside a ptrace-restricted sandbox.
+This instruments LightnerX and its consumers, including tests and any dependency templates instantiated in their code. The GameNetworkingSockets build disables RTTI, so GNS-linked targets disable only UBSan's `vptr` check. The transport and allocation mock tests retain `vptr` checks. Fault-injection tests enable both ASan and UBSan when sanitizers are requested. Enabled sanitizer diagnostics fail tests immediately. LeakSanitizer may require execution outside a ptrace-restricted sandbox.

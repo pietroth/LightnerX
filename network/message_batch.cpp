@@ -1,7 +1,7 @@
 #include <lightnerx/network/message_batch.hpp>
 
 #include <cstddef>
-#include <lightnerx/compact/expected.hpp>
+#include <zeus/expected.hpp>
 #include <tcb/span.hpp>
 #include <stdexcept>
 #include <system_error>
@@ -39,24 +39,24 @@ namespace lightnerx::network {
         pending.messages.reserve(static_cast<std::size_t>(capacity));
     }
 
-    lightnerx::compact::expected<void, std::error_code> queueMessage(
+    zeus::expected<void, std::error_code> queueMessage(
         OutboundMessage message
     ) {
         detail::setNetworkCleanup(&clearMessagesBatcher);
         if (message.message == nullptr) {
-            return lightnerx::compact::unexpected(std::make_error_code(std::errc::invalid_argument));
+            return zeus::unexpected(std::make_error_code(std::errc::invalid_argument));
         }
 
         if (pending.messages.size() >= pending.messages.capacity()) {
             message.message->Release();
-            return lightnerx::compact::unexpected(std::make_error_code(std::errc::not_enough_memory));
+            return zeus::unexpected(std::make_error_code(std::errc::not_enough_memory));
         }
 
         pending.messages.push_back(std::move(message));
         return {};
     }
 
-    lightnerx::compact::expected<void, std::error_code> flushAll(
+    zeus::expected<void, std::error_code> flushAll(
         const ConnectionManager& connectionManager
     ) {
         struct ReleasePending {
@@ -70,7 +70,7 @@ namespace lightnerx::network {
                 static_cast<size_t>(message.message->m_cbSize)
             };
 
-            lightnerx::compact::expected<void, std::error_code> result;
+            zeus::expected<void, std::error_code> result;
 
             if (message.target.isSingle()) {
                 result = lightnerx::network::sendToConnection(
@@ -98,7 +98,7 @@ namespace lightnerx::network {
         }
 
         if (lastError) {
-            return lightnerx::compact::unexpected(lastError);
+            return zeus::unexpected(lastError);
         }
 
         return {};
