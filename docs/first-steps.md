@@ -2,7 +2,7 @@
 
 The examples use `tcb::span` for byte views and `zeus::expected` for results. See [C++17 byte views and results](cpp17-types.md).
 
-This guide shows the essential flow for setting up a server and a client. The examples use LightnerX components directly and leave the execution model to the application. The two programs illustrate separate consuming applications; the library remains a static library.
+This guide shows the essential flow for setting up a server and a client. The examples use LightnerX components directly and leave the execution model to the application. Each program is built as a separate application.
 
 ## Server
 
@@ -175,7 +175,7 @@ int main() {
 
 The `server.update()` and `client.update()` methods are called by the application. They can run on the main thread, on a dedicated thread, or within the consuming project's existing execution loop.
 
-The library does not require a specific number of threads or a fixed interval between updates. Run these server and client examples in separate processes: exactly one started wrapper owns networking in each process. Wrappers cannot be copied or moved.
+The application chooses the number of threads and the interval between updates. Run these server and client examples in separate processes so each wrapper can own its LightnerX runtime. Keep wrappers at a fixed address for their lifetime.
 
 Receive callbacks run during `update()`, and interpretation callbacks run on the thread that calls the interpreter. When sharing components across threads, handle synchronization in the application. For the batcher, serialize initialization, queuing, clearing and flush calls, which operate on the same queue. Callback exceptions propagate after resource cleanup; catch them around `update()` if the application intends to continue. See [callback behavior](api.md#validation-and-callback-behavior) for supported reentrant operations.
 

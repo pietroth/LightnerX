@@ -46,12 +46,47 @@ add_test(NAME lightnerx.transport_faults
         --compiler "${CMAKE_CXX_COMPILER}" "--flags=${CMAKE_CXX_FLAGS}" ${message_fault_options})
 set_tests_properties(lightnerx.transport_faults PROPERTIES TIMEOUT 180)
 
-add_test(NAME lightnerx.lifecycle_faults
-    COMMAND ${Python3_EXECUTABLE} "${CMAKE_CURRENT_SOURCE_DIR}/lifecycle_faults.py"
-        --compiler "${CMAKE_CXX_COMPILER}" "--flags=${CMAKE_CXX_FLAGS}" --library "$<TARGET_FILE:GameNetworkingSockets>"
-        ${message_fault_options}
-)
-set_tests_properties(lightnerx.lifecycle_faults PROPERTIES TIMEOUT 180)
+file(GLOB lifecycle_fault_headers CONFIGURE_DEPENDS
+    "${PROJECT_SOURCE_DIR}/include/lightnerx/network/*.hpp")
+set(lifecycle_fault_source "${CMAKE_CURRENT_BINARY_DIR}/lifecycle_faults.cpp")
+add_custom_command(OUTPUT "${lifecycle_fault_source}"
+    COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/lifecycle_faults.py"
+        --output "${lifecycle_fault_source}"
+    DEPENDS lifecycle_faults.py source_support.py ${lifecycle_fault_headers}
+        "${PROJECT_SOURCE_DIR}/network/client.cpp"
+        "${PROJECT_SOURCE_DIR}/network/server.cpp"
+        "${PROJECT_SOURCE_DIR}/network/network_manager.cpp"
+    VERBATIM)
+add_executable(lightnerx_test_lifecycle_faults "${lifecycle_fault_source}")
+# The source defines the wrappers itself. On shared builds it must not import them.
+target_link_libraries(lightnerx_test_lifecycle_faults PRIVATE ${lightnerx_gns_target})
+target_include_directories(lightnerx_test_lifecycle_faults PRIVATE
+    "${PROJECT_SOURCE_DIR}/external/span/include"
+    "${PROJECT_SOURCE_DIR}/external/expected/include")
+target_compile_definitions(lightnerx_test_lifecycle_faults PRIVATE TCB_SPAN_TERMINATE_ON_CONTRACT_VIOLATION)
+if(LIGHTNERX_SANITIZERS)
+    target_compile_options(lightnerx_test_lifecycle_faults PRIVATE
+        "-fsanitize=${LIGHTNERX_SANITIZERS}" -fno-omit-frame-pointer -fno-sanitize-recover=all)
+    if(LIGHTNERX_SANITIZERS MATCHES "undefined")
+        target_compile_options(lightnerx_test_lifecycle_faults PRIVATE -fno-sanitize=vptr)
+    endif()
+    target_link_options(lightnerx_test_lifecycle_faults PRIVATE "-fsanitize=${LIGHTNERX_SANITIZERS}")
+endif()
+add_test(NAME lightnerx.lifecycle_faults COMMAND lightnerx_test_lifecycle_faults)
+set_tests_properties(lightnerx.lifecycle_faults PROPERTIES TIMEOUT 60)
+
+if(LIGHTNERX_BUILD_SHARED AND UNIX)
+    foreach(plugin IN ITEMS first second)
+        add_library(lightnerx_test_plugin_${plugin} MODULE runtime_plugin.cpp)
+        target_link_libraries(lightnerx_test_plugin_${plugin} PRIVATE LightnerX)
+    endforeach()
+    add_executable(lightnerx_test_shared_runtime shared_runtime.cpp)
+    # Link so the process has the sanitizer runtime before loading instrumented modules.
+    target_link_libraries(lightnerx_test_shared_runtime PRIVATE LightnerX ${CMAKE_DL_LIBS})
+    add_test(NAME lightnerx.shared_runtime COMMAND lightnerx_test_shared_runtime
+        "$<TARGET_FILE:lightnerx_test_plugin_first>" "$<TARGET_FILE:lightnerx_test_plugin_second>")
+    set_tests_properties(lightnerx.shared_runtime PROPERTIES TIMEOUT 60)
+endif()
 
 add_test(NAME lightnerx.integration
     COMMAND ${Python3_EXECUTABLE} "${CMAKE_CURRENT_SOURCE_DIR}/integration.py"
@@ -95,6 +130,9 @@ add_test(NAME lightnerx.consumer
         --test-command lightnerx_consumer${CMAKE_EXECUTABLE_SUFFIX}
 )
 set_tests_properties(lightnerx.consumer PROPERTIES
+            "-DBUILD_SHARED_LIB=${BUILD_SHARED_LIB}"
+            "-DBUILD_STATIC_LIB=${BUILD_STATIC_LIB}"
+            "-DLIGHTNERX_BUILD_SHARED=${LIGHTNERX_BUILD_SHARED}"
     TIMEOUT 600
     ENVIRONMENT "CMAKE_BUILD_PARALLEL_LEVEL=2"
 )

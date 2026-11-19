@@ -1,6 +1,6 @@
 ![LightnerX](docs/LightnerX%20Framed%20Wordmark.png)
 
-LightnerX is a static C++17 library for building applications that communicate using the INER semantic protocol. The CMake project provides the `LightnerX` target; it neither produces nor requires its own executable. The library provides types for representing messages, interpreters, callbacks, connection management, and a transport layer based on GameNetworkingSockets.
+LightnerX is a C++17 library for building applications that communicate using the INER semantic protocol. The CMake project provides the `LightnerX` target; it neither produces nor requires its own executable. The library provides types for representing messages, interpreters, callbacks, connection management, and a transport layer based on GameNetworkingSockets.
 
 ## Why LightnerX?
 
@@ -487,4 +487,4 @@ int main() {
 
 ## Runtime contracts
 
-One started `Client` or `Server` owns networking per process. Both classes have stable addresses and cannot be copied or moved. `Server::close()` and either owner's destructor release the runtime; a client can disconnect and reconnect without being destroyed. Direct `networkInit()` / `networkKill()` remain available when using the transport without a wrapper. See [API reference](docs/api.md) for shutdown, callback exceptions, reentrancy and message validation contracts.
+One started `Client` or `Server` owns networking when the process uses a single LightnerX library instance. Applications with multiple plugins should link them to the same shared LightnerX library. Both classes have stable addresses and cannot be copied or moved. `Server::close()` and either owner's destructor release the runtime; a client can disconnect and reconnect without being destroyed. Direct `networkInit()` / `networkKill()` remain available when using the transport without a wrapper. See [API reference](docs/api.md) for shutdown, callback exceptions, reentrancy and message validation contracts.

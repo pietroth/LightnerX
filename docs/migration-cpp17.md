@@ -19,7 +19,7 @@ CMake 3.22 or newer and the public `cxx_std_17` requirement replace the experime
 - Packed header sizes remain Event 4, Notification 4, Intention 6, Response 5 and UnsuccessfulResponse 7 bytes. Native-endian fields and authority size/type encoding remain unchanged.
 - Parsing still requires one complete frame, rejects truncation and unknown statuses, and preserves the existing extra-byte handling for approved, failure, denied and partially approved responses.
 - Group and broadcast sends attempt every selected destination and return the first error. Queue flush attempts all entries, releases messages and returns the last error. Queuing consumes ownership even when rejected.
-- Client and Server remain noncopyable and nonmovable, with one active network owner per process. Callback registration, exceptions, recursive-update rejection and deferred server close retain their behavior.
+- Client and Server remain noncopyable and nonmovable. One wrapper owns networking per LightnerX library instance. Multiple plugins use the same instance when they link to the [shared library](setup.md#consuming-with-cmake).
 - Connection IDs remain 1–65535 with independent mappings, recycling, strong copy assignment and bounded mutation during iteration.
 
 ## Recorded baseline and differential tests
