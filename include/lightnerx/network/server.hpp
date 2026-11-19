@@ -72,6 +72,8 @@ namespace lightnerx::network {
         void close() noexcept;
 
         private:
+            void closeResources(bool shutdown) noexcept;
+
             inline static Server* s_pCallbackInstance = nullptr;
 
             static void SteamNetConnectionStatusChangedCallback(

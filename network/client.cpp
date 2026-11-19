@@ -51,11 +51,12 @@ zeus::expected<void, std::error_code> Client::start() {
     m_sockets = SteamNetworkingSockets();
 
     if (!m_sockets) {
-        detail::releaseNetworkOwner(this);
+        detail::releaseNetworkOwner(this, !networkWasInitialized);
 
         return zeus::unexpected(
             std::make_error_code(std::errc::io_error)
         );
+    const bool networkWasInitialized = isNetworkInitialized();
     }
 
     s_callbackInstance = this;

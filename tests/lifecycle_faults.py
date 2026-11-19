@@ -8,7 +8,7 @@ from pathlib import Path
 import shlex
 import subprocess
 import tempfile
-from source_support import INCLUDE_FLAGS, body
+from source_support import INCLUDE_FLAGS, body, replace_once
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--compiler', default='c++')
@@ -50,6 +50,8 @@ bool failListener = false, failPoll = false;
 std::function<void()> serverCallbacks;
 std::vector<SteamNetworkingMessage_t*> allocatedMessages;
 void check(bool value, const char* message) { if (!value) throw std::runtime_error(message); }
+bool failAccept = false, failPollAssignment = false;
+int networkCleanups = 0;
 struct TrackedMessage : SteamNetworkingMessage_t {
     TrackedMessage() : SteamNetworkingMessage_t{} {}
 };
@@ -87,7 +89,10 @@ HSteamNetPollGroup createPoll() {
 void runServerCallbacks() {
     if (serverCallbacks) std::exchange(serverCallbacks, {})();
 }
-EResult acceptConnection(HSteamNetConnection) { return k_EResultOK; }
+EResult acceptConnection(HSteamNetConnection) { return failAccept ? k_EResultFail : k_EResultOK; }
+bool setConnectionPollGroup(HSteamNetConnection handle, HSteamNetPollGroup group) {
+    return !failPollAssignment && SteamNetworkingSockets()->SetConnectionPollGroup(handle, group);
+}
 '''
 if args.baseline:
     source = '#include <span>\n#include <expected>\n' + source
@@ -100,15 +105,20 @@ for name in ['network_manager', 'client', 'server']:
     else:
         code = body('network/' + name + '.cpp')
     code = code.replace('private:', 'public:')
-    for original, replacement in [
-        ('m_sockets->ReceiveMessagesOnConnection(', 'receiveClient('),
-        ('m_pInterface->ReceiveMessagesOnPollGroup(', 'receiveServer('),
-        ('m_pInterface->CreateListenSocketIP(', 'createListener('),
-        ('m_pInterface->CreatePollGroup()', 'createPoll()'),
-        ('m_pInterface->RunCallbacks()', 'runServerCallbacks()'),
-        ('m_pInterface->AcceptConnection(', 'acceptConnection('),
-    ]:
-        code = code.replace(original, replacement)
+    replacements = {
+        'client': [('m_sockets->ReceiveMessagesOnConnection(', 'receiveClient(')],
+        'server': [
+            ('m_pInterface->ReceiveMessagesOnPollGroup(', 'receiveServer('),
+            ('m_pInterface->CreateListenSocketIP(', 'createListener('),
+            ('m_pInterface->CreatePollGroup()', 'createPoll()'),
+            ('m_pInterface->RunCallbacks()', 'runServerCallbacks()'),
+            ('m_pInterface->AcceptConnection(', 'acceptConnection('),
+        ],
+    }
+    for original, replacement in replacements.get(name, []):
+        code = replace_once(code, original, replacement)
+    if not args.baseline and name == 'server':
+        code = replace_once(code, 'm_pInterface->SetConnectionPollGroup(', 'setConnectionPollGroup(')
     source += '\n' + code
 
 if args.baseline:
@@ -210,6 +220,52 @@ int main() {
         { Server server; check(server.start(45333, 1000).has_value(), "server start");
           HSteamNetConnection a, b;
           check(SteamNetworkingSockets()->CreateSocketPair(&a, &b, false, nullptr, nullptr), "pair");
+        { Server server;
+          check(networkInit(), "manual initialization for rollback");
+          auto* sockets = SteamNetworkingSockets();
+          HSteamNetConnection a, b;
+          check(sockets->CreateSocketPair(&a, &b, false, nullptr, nullptr), "manual socket pair");
+          detail::setNetworkCleanup([]() noexcept { ++networkCleanups; });
+          failListener = true;
+          check(!server.start(45333, 1000), "manual-runtime listener fault");
+          failListener = false;
+          failPoll = true;
+          check(!server.start(45333, 1000), "manual-runtime poll group fault");
+          failPoll = false;
+          check(isNetworkInitialized() && SteamNetworkingSockets() == sockets, "startup stopped manual runtime");
+          SteamNetConnectionInfo_t info{};
+          check(sockets->GetConnectionInfo(a, &info), "startup closed a preexisting connection");
+          check(networkCleanups == 0, "startup cleared pending messages");
+          networkKill();
+          detail::setNetworkCleanup(nullptr);
+          check(networkCleanups == 1 && !isNetworkInitialized(), "caller could not shut down after rollback");
+        }
+        { Server server; check(server.start(45333, 1000).has_value(), "admission test start");
+          int admissions = 0, disconnections = 0;
+          server.addClientConnectedCallback([&](auto conn) {
+              ++admissions;
+              check(server.disconnectConnection(conn, false).has_value(), "disconnect during admission");
+          });
+          server.addClientConnectedCallback([&](auto) { ++admissions; });
+          server.addClientDisconnectedCallback([&](auto) { ++disconnections; });
+          for (int attempt = 0; attempt < 3; ++attempt) {
+              HSteamNetConnection a, b;
+              auto* sockets = SteamNetworkingSockets();
+              check(sockets->CreateSocketPair(&a, &b, false, nullptr, nullptr), "admission socket pair");
+              failAccept = attempt == 0;
+              failPollAssignment = attempt == 1;
+              SteamNetConnectionStatusChangedCallback_t event{};
+              event.m_hConn = a;
+              event.m_info.m_hListenSocket = server.m_hListenSocket;
+              event.m_info.m_eState = k_ESteamNetworkingConnectionState_Connecting;
+              serverCallbacks = [&] { Server::SteamNetConnectionStatusChangedCallback(&event); };
+              check(server.update().has_value(), "drive admission");
+              SteamNetConnectionInfo_t info{};
+              check(!sockets->GetConnectionInfo(a, &info), "rejected connection remained open");
+              check(admissions == (attempt == 2) && disconnections == admissions, "unexpected admission notifications");
+              check(sockets->CloseConnection(b, 0, nullptr, false), "clean up admission peer");
+          }
+        }
           server.addClientConnectedCallback([&](auto) {
               server.addClientConnectedCallback([](auto) {});
               throw 44;

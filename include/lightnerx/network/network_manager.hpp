@@ -15,7 +15,7 @@ namespace lightnerx::network {
     namespace detail {
         void setNetworkCleanup(void (*cleanup)() noexcept) noexcept;
         zeus::expected<void, std::error_code> acquireNetworkOwner(const void* owner);
-        void releaseNetworkOwner(const void* owner) noexcept;
+        void releaseNetworkOwner(const void* owner, bool shutdown = true) noexcept;
     }
 }
 
