@@ -7,7 +7,7 @@ the module-era tests. The ordinary C++ tests link the unmodified library.
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-INCLUDE_FLAGS = [
+INCLUDE_FLAGS = ['-DTCB_SPAN_TERMINATE_ON_CONTRACT_VIOLATION'] + [
     '-I' + str(ROOT / directory)
     for directory in (
         'include',

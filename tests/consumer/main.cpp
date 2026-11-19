@@ -9,6 +9,10 @@
 #include <lightnerx/network/message_batch.hpp>
 #include <lightnerx/network/connection_manager.hpp>
 
+#ifndef TCB_SPAN_TERMINATE_ON_CONTRACT_VIOLATION
+#error "The LightnerX target must propagate the span contract policy to consumers"
+#endif
+
 static_assert(lightnerx::network::k_invalidConnection == k_HSteamNetConnection_Invalid);
 static_assert(!std::is_copy_constructible_v<lightnerx::network::Client>);
 
