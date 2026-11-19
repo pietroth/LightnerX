@@ -1,6 +1,6 @@
 # Setup
 
-LightnerX is a static C++17 library. CMake provides the `LightnerX` target. The application supplies its own executable.
+LightnerX is a C++17 library built statically by default. CMake provides the `LightnerX` target. The application supplies its own executable.
 
 ## Dependencies and toolchain
 
@@ -46,6 +46,8 @@ cmake --build build/debug --parallel 2
 
 To select a compiler, pass `-DCMAKE_C_COMPILER=gcc-14 -DCMAKE_CXX_COMPILER=g++-14`, or `-DCMAKE_C_COMPILER=clang-19 -DCMAKE_CXX_COMPILER=clang++-19`, in a fresh build directory. Use `-DCMAKE_BUILD_TYPE=Release` for a release build.
 
+LightnerX uses the shared GNS target when available. Configure with `-DBUILD_SHARED_LIB=OFF -DBUILD_STATIC_LIB=ON` to use static GNS. These options select the GNS variant independently of LightnerX.
+
 ## Consuming with CMake
 
 The target propagates C++17, LightnerX and dependency headers, compile definitions and link requirements. Consumers link `LightnerX`:
@@ -73,6 +75,8 @@ Use ordinary headers and sources with compatible compiler and standard-library A
 
 Byte views use `tcb::span` from `<tcb/span.hpp>` and results use `zeus::expected` from `<zeus/expected.hpp>`. Both dependencies are header-only and available to consumers through the `LightnerX` target. See [C++17 byte views and results](cpp17-types.md) for examples.
 
+For a host application that loads multiple plugins, configure with `-DLIGHTNERX_BUILD_SHARED=ON` and link each plugin to the same `LightnerX` target from the host build. Ship one shared library instance with the application. Static linking is supported for consumers that link LightnerX once into the process. Separate static copies embedded in plugins have separate state and can interfere with the same GNS runtime.
+
 ## Regression tests
 
 ```bash
@@ -95,4 +99,4 @@ ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 \
   ctest --test-dir build/sanitizers --output-on-failure
 ```
 
-This instruments LightnerX and its consumers, including tests and any dependency templates instantiated in their code. The GameNetworkingSockets build disables RTTI, so GNS-linked targets disable only UBSan's `vptr` check. The transport and allocation mock tests retain `vptr` checks. Fault-injection tests enable both ASan and UBSan when sanitizers are requested. Enabled sanitizer diagnostics fail tests immediately. LeakSanitizer may require execution outside a ptrace-restricted sandbox.
+This instruments LightnerX and its consumers, including tests and any dependency templates instantiated in their code. The GameNetworkingSockets build disables RTTI, so GNS-linked targets disable UBSan's `vptr` check. The standalone mock tests enable both ASan and UBSan when sanitizers are requested. The lifecycle fault test uses the selected sanitizer list and links to the configured GNS target. Enabled sanitizer diagnostics fail tests immediately. LeakSanitizer may require execution outside a ptrace-restricted sandbox.

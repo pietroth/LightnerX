@@ -258,9 +258,11 @@ bool isNetworkInitialized();
 
 `networkInit()` initializes GameNetworkingSockets and is idempotent. `isNetworkInitialized()` reports whether the registered runtime and interface exist. Without a started wrapper, `networkKill()` releases queued messages, shuts down networking and resets the state; it is safe to call repeatedly and initialize again.
 
-Exactly one started `Client` **or** `Server` may own the runtime per process. Starting the same owner again returns `operation_in_progress`; another owner returns `device_or_resource_busy`. Both types are noncopyable and nonmovable. A failed start cleans up acquired resources and permits retry. `Server::close()` (also called by its destructor) or the client destructor releases ownership and destroys the runtime, including a runtime initialized manually before `start()`.
+A single LightnerX library instance allows exactly one started `Client` or `Server` to own the runtime. Starting the same owner again returns `operation_in_progress`. Starting another owner returns `device_or_resource_busy`. Both types are noncopyable and nonmovable. A failed start releases resources created by that attempt and permits retry. If the application initialized the network manually, the failed attempt preserves the runtime, existing connections and pending messages. A successful start adopts that runtime. The server close or the client destructor releases ownership and shuts down the adopted runtime. For multiple plugins, use one [shared LightnerX library](setup.md#consuming-with-cmake) across the process.
 
 While a wrapper owns the runtime, `networkKill()` defers shutdown until that owner releases it. The interface remains usable and `isNetworkInitialized()` remains true in the meantime. Direct external `GameNetworkingSockets_Kill()` and raw `RunCallbacks()` during wrapper ownership are unsupported; use LightnerX lifecycle and update operations. Synchronize all network operations across threads in the application.
+
+`g_bNetworkInitialized` is a legacy public flag maintained by LightnerX. Use `isNetworkInitialized()` to query the runtime state and the lifecycle functions to change it.
 
 `k_invalidConnection` is declared once in `<lightnerx/network/network_manager.hpp>`, which is included by the client and transport headers.
 

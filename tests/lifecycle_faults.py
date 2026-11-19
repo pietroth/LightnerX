@@ -12,11 +12,14 @@ from source_support import INCLUDE_FLAGS, body, replace_once
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--compiler', default='c++')
-parser.add_argument('--library', type=Path, required=True)
+parser.add_argument('--library', type=Path)
+parser.add_argument('--output', type=Path, help='Generate the C++ test for CMake')
 parser.add_argument('--flags', default='')
 parser.add_argument('--sanitize', action='store_true')
 parser.add_argument('--baseline', action='store_true')
 args = parser.parse_args()
+if not args.library and not args.output:
+    parser.error('provide --output or --library')
 root = Path(__file__).resolve().parents[1]
 
 source = r'''
@@ -47,11 +50,11 @@ source = r'''
 #include <steam/isteamnetworkingutils.h>
 int liveMessages = 0, clientReceive = 0, serverReceive = 0;
 bool failListener = false, failPoll = false;
+bool failAccept = false, failPollAssignment = false;
+int networkCleanups = 0;
 std::function<void()> serverCallbacks;
 std::vector<SteamNetworkingMessage_t*> allocatedMessages;
 void check(bool value, const char* message) { if (!value) throw std::runtime_error(message); }
-bool failAccept = false, failPollAssignment = false;
-int networkCleanups = 0;
 struct TrackedMessage : SteamNetworkingMessage_t {
     TrackedMessage() : SteamNetworkingMessage_t{} {}
 };
@@ -217,9 +220,6 @@ int main() {
           try { server.update(); check(false, "server exception lost"); } catch (int value) { check(value == 43, "server exception identity"); }
           check(liveMessages == 0 && !isNetworkInitialized(), "server exception cleanup precedes shutdown");
         }
-        { Server server; check(server.start(45333, 1000).has_value(), "server start");
-          HSteamNetConnection a, b;
-          check(SteamNetworkingSockets()->CreateSocketPair(&a, &b, false, nullptr, nullptr), "pair");
         { Server server;
           check(networkInit(), "manual initialization for rollback");
           auto* sockets = SteamNetworkingSockets();
@@ -266,6 +266,9 @@ int main() {
               check(sockets->CloseConnection(b, 0, nullptr, false), "clean up admission peer");
           }
         }
+        { Server server; check(server.start(45333, 1000).has_value(), "server start");
+          HSteamNetConnection a, b;
+          check(SteamNetworkingSockets()->CreateSocketPair(&a, &b, false, nullptr, nullptr), "pair");
           server.addClientConnectedCallback([&](auto) {
               server.addClientConnectedCallback([](auto) {});
               throw 44;
@@ -292,6 +295,10 @@ int main() {
     }
 }
 '''
+
+if args.output:
+    args.output.write_text(source)
+    raise SystemExit(0)
 
 with tempfile.TemporaryDirectory(prefix='lightnerx-lifecycle-') as directory:
     cpp = Path(directory) / 'lifecycle.cpp'

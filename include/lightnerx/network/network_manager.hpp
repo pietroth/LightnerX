@@ -8,6 +8,9 @@
 
 namespace lightnerx::network {
     inline constexpr HSteamNetConnection k_invalidConnection = k_HSteamNetConnection_Invalid;
+#if defined(_WIN32) && defined(LIGHTNERX_SHARED) && !defined(LightnerX_EXPORTS)
+    __declspec(dllimport)
+#endif
     extern bool g_bNetworkInitialized;
     bool networkInit();
     void networkKill();
