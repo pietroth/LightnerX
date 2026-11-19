@@ -62,6 +62,21 @@ void smoke() {
     check(server.start(-1, 1000).error() == std::errc::invalid_argument, "invalid port");
     check(server.start(0, 1000).error() == std::errc::invalid_argument, "GNS requires an explicit listen port");
     check(!isNetworkInitialized(), "argument rejection preserves network state");
+    {
+        Client client;
+        check(client.start().has_value(), "client start for literal validation");
+        for (const std::string_view ip : {"127.0.0.1abc", "127.0.0.1:1234", "[127.0.0.1]",
+                                          "127.0.0.256", "::1xyz", "[::1]:1234"}) {
+            const auto result = client.connect(ip, 45333);
+            check(!result && result.error() == std::errc::invalid_argument, "invalid IP literal accepted");
+        }
+        constexpr char withNul[] = "127.0.0.1\0suffix";
+        const auto result = client.connect(std::string_view(withNul, sizeof(withNul) - 1), 45333);
+        check(!result && result.error() == std::errc::invalid_argument, "embedded NUL accepted");
+        check(client.getServerHConn() == k_invalidConnection, "invalid IP created a connection");
+        check(client.connect("[::1]", 45333).has_value(), "bracketed IPv6 literal rejected");
+        check(client.disconnect(false).has_value(), "IPv6 cleanup");
+    }
     std::cout << "Lifecycle and ownership regressions passed" << '\n';
 }
 

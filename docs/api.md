@@ -343,7 +343,7 @@ bool isConnected() const noexcept;
 HSteamNetConnection getServerHConn() const noexcept;
 ```
 
-`start()` initializes the transport. `connect()` initiates the connection to the specified IP address and port; monitor `isConnected()` while calling `update()` to observe the connection being established. `update()` runs network callbacks and processes up to the specified number of messages; values less than or equal to zero run only the network callbacks.
+`start()` initializes the transport. `connect()` initiates the connection to a numeric IPv4 or IPv6 literal and the separate port argument. IPv6 may be enclosed in brackets. Hostnames, scope identifiers, embedded ports, embedded NULs and trailing characters are rejected with `invalid_argument`. After calling `connect()`, monitor `isConnected()` while calling `update()` to observe the connection being established. `update()` runs network callbacks and processes up to the specified number of messages; values less than or equal to zero run only the network callbacks.
 
 `getServerHConn()` returns the handle used to send messages to the server, for example with `Target::single(client.getServerHConn())`. The receive callback is stored by the client, and the provided span remains valid during its execution.
 
