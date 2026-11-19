@@ -31,9 +31,14 @@ zeus::expected<void, std::error_code> Server::start(int port, uint32_t timeoutCo
     if (port < 1 || port > 65535 || timeoutConnected > INT32_MAX) {
         return zeus::unexpected(std::make_error_code(std::errc::invalid_argument));
     }
+    const bool networkWasInitialized = isNetworkInitialized();
     if (auto acquired = detail::acquireNetworkOwner(this); !acquired) return acquired;
 
     m_pInterface = SteamNetworkingSockets();
+    if (!m_pInterface) {
+        detail::releaseNetworkOwner(this, !networkWasInitialized);
+        return zeus::unexpected(std::make_error_code(std::errc::io_error));
+    }
     closeRequested = false;
     callbackException = nullptr;
 
@@ -62,14 +67,14 @@ zeus::expected<void, std::error_code> Server::start(int port, uint32_t timeoutCo
     );
 
     if (m_hListenSocket == k_invalidSocket) {
-        close();
+        closeResources(!networkWasInitialized);
         return zeus::unexpected(std::make_error_code(std::errc::resource_unavailable_try_again));
     }
 
     m_hPollGroup = m_pInterface->CreatePollGroup();
 
     if (m_hPollGroup == k_invalidPollGroup) {
-        close();
+        closeResources(!networkWasInitialized);
         return zeus::unexpected(std::make_error_code(std::errc::resource_unavailable_try_again));
     }
 
@@ -160,6 +165,10 @@ void Server::close() noexcept {
         closeRequested = true;
         return;
     }
+    closeResources(true);
+}
+
+void Server::closeResources(bool shutdown) noexcept {
     if (m_pInterface == nullptr) {
         return;
     }
@@ -179,7 +188,7 @@ void Server::close() noexcept {
     closeRequested = false;
     callbackException = nullptr;
 
-    detail::releaseNetworkOwner(this);
+    detail::releaseNetworkOwner(this, shutdown);
 }
 
 void Server::SteamNetConnectionStatusChangedCallback(
@@ -218,6 +227,9 @@ void Server::OnConnectionStatusChanged(SteamNetConnectionStatusChangedCallback_t
 
             const auto count = clientConnectedCallbacks.size();
             for (std::size_t i = 0; i < count && !closeRequested; ++i) {
+                if (i != 0 && !m_pInterface->GetConnectionInfo(hConn, &info)) {
+                    break;
+                }
                 clientConnectedCallbacks[i](hConn);
             }
 

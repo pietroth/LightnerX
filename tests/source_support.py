@@ -29,3 +29,9 @@ def body(path, *, steam=True):
                 continue
             lines.append(line)
     return '\n'.join(lines)
+
+
+def replace_once(source, original, replacement):
+    if source.count(original) != 1:
+        raise SystemExit(f'Expected exactly one fault injection point: {original}')
+    return source.replace(original, replacement)
