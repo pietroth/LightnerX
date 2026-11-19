@@ -12,6 +12,10 @@ foreach(test_name IN ITEMS connection_manager connection_manager_assignment mess
 endforeach()
 
 find_package(Python3 REQUIRED COMPONENTS Interpreter)
+find_program(LIGHTNERX_BASH bash REQUIRED)
+if(NOT CMAKE_CXX_COMPILER_ID MATCHES "^(GNU|Clang|AppleClang)$" OR MSVC)
+    message(FATAL_ERROR "LightnerX regression tests require a GCC- or Clang-compatible compiler driver")
+endif()
 add_executable(lightnerx_test_characterization characterization.cpp)
 target_link_libraries(lightnerx_test_characterization PRIVATE LightnerX)
 add_test(NAME lightnerx.characterization
@@ -126,13 +130,13 @@ add_test(NAME lightnerx.consumer
             "-DCMAKE_CXX_FLAGS=${CMAKE_CXX_FLAGS}"
             "-DCMAKE_EXE_LINKER_FLAGS=${CMAKE_EXE_LINKER_FLAGS}"
             "-DCMAKE_SHARED_LINKER_FLAGS=${CMAKE_SHARED_LINKER_FLAGS}"
+            "-DBUILD_SHARED_LIB=${BUILD_SHARED_LIB}"
+            "-DBUILD_STATIC_LIB=${BUILD_STATIC_LIB}"
+            "-DLIGHTNERX_BUILD_SHARED=${LIGHTNERX_BUILD_SHARED}"
             "-DLIGHTNERX_SANITIZERS=${LIGHTNERX_SANITIZERS}"
         --test-command lightnerx_consumer${CMAKE_EXECUTABLE_SUFFIX}
 )
 set_tests_properties(lightnerx.consumer PROPERTIES
-            "-DBUILD_SHARED_LIB=${BUILD_SHARED_LIB}"
-            "-DBUILD_STATIC_LIB=${BUILD_STATIC_LIB}"
-            "-DLIGHTNERX_BUILD_SHARED=${LIGHTNERX_BUILD_SHARED}"
     TIMEOUT 600
     ENVIRONMENT "CMAKE_BUILD_PARALLEL_LEVEL=2"
 )
@@ -143,7 +147,7 @@ list(APPEND documentation_pages "${PROJECT_SOURCE_DIR}/README.md")
 set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
     ${documentation_pages} "${CMAKE_CURRENT_SOURCE_DIR}/documentation.py")
 execute_process(COMMAND ${Python3_EXECUTABLE} "${CMAKE_CURRENT_SOURCE_DIR}/documentation.py"
-    --output "${CMAKE_CURRENT_BINARY_DIR}/documentation"
+    --output "${CMAKE_CURRENT_BINARY_DIR}/documentation" --bash "${LIGHTNERX_BASH}"
     RESULT_VARIABLE documentation_status OUTPUT_VARIABLE documentation_sources
     OUTPUT_STRIP_TRAILING_WHITESPACE)
 if(NOT documentation_status EQUAL 0)

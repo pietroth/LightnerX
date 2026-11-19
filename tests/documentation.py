@@ -13,6 +13,7 @@ from urllib.parse import unquote
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--output', type=Path, required=True)
+parser.add_argument('--bash', default='bash')
 args = parser.parse_args()
 root = Path(__file__).resolve().parents[1]
 args.output.mkdir(parents=True, exist_ok=True)
@@ -35,7 +36,7 @@ for page in pages:
                     raise SystemExit(f'{page}: broken local anchor {destination}')
     for language, code in re.findall(r'```(bash|cmake)\n(.*?)```', text, re.S):
         if language == 'bash':
-            subprocess.run(['bash', '-n'], input=code, text=True, check=True)
+            subprocess.run([args.bash, '-n'], input=code, text=True, check=True)
         elif any(token in code for token in ['CXX_MODULE', 'CXX_IMPORT_STD', 'cxx_std_26']):
             raise SystemExit(f'{page}: obsolete CMake example')
     for code in blocks[page.name]:
