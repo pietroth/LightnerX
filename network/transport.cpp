@@ -78,7 +78,7 @@ zeus::expected<void, std::error_code> broadcast(
     ) {
     std::optional<std::error_code> error;
 
-    connectionManager.forEach([&](uint16_t id, HSteamNetConnection hConn) {
+    connectionManager.forEach([&](uint16_t, HSteamNetConnection hConn) {
         if (std::find(exceptions.begin(), exceptions.end(), hConn) != exceptions.end()) {
             return ;
         }
