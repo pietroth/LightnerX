@@ -20,7 +20,7 @@ Initialize or update them from the repository root.
 git submodule update --init --recursive
 ```
 
-Install OpenSSL and Protobuf development packages, the Protobuf compiler, and Python 3 when building tests. For example, on Debian 13:
+Install the OpenSSL and Protobuf development packages and the Protobuf compiler. Running the regression suite also requires Python 3, Bash and a GCC- or Clang-compatible compiler driver. On Debian 13, install these packages.
 
 ```bash
 sudo apt-get install cmake g++-14 clang-19 ninja-build libssl-dev libprotobuf-dev protobuf-compiler python3-venv pkg-config
@@ -85,7 +85,7 @@ cmake --build build/tests --parallel 2
 ctest --test-dir build/tests --output-on-failure
 ```
 
-Tests cover deterministic protocol characterization, routing and allocation failures, the complete client ID domain, callbacks, ownership and multi-file consumers. They also compile the documentation's C++ examples. Assertions remain enabled in Release. Network integration requires local UDP socket access.
+Tests cover deterministic protocol characterization, routing and allocation failures, the complete client ID domain, callbacks, ownership and multi-file consumers. They also compile the documentation's C++ examples. Checks remain active in Release. Network integration requires local UDP socket access. Shared LightnerX builds on Unix also test that two loaded modules share ownership of the runtime. The byte-for-byte comparison with the historical fixture runs on little-endian hosts. On big-endian hosts, that test checks the symbolic error results and parser call count.
 
 For cross-version UDP tests, also pass `-DLIGHTNERX_REFERENCE_BINARY=/absolute/path/to/original/lightnerx_test_lifecycle`. CTest then pairs the old server with the new client and the new server with the old client. [Migration validation](migration-cpp17.md) identifies the original revision and build requirements. The [CI workflow](../.github/workflows/cpp17.yml) builds it separately.
 
