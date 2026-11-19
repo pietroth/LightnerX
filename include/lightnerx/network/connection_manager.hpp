@@ -8,6 +8,7 @@
 #include <limits>
 #include <optional>
 #include <set>
+#include <type_traits>
 #include <unordered_map>
 #include <vector>
 
@@ -20,8 +21,8 @@ namespace lightnerx::network {
     private:
         std::vector<HSteamNetConnection> clients;
         std::unordered_map<HSteamNetConnection, uint16_t> clientIds;
-        int maxCapacity;
-        int onlineCount;
+        int maxCapacity = 0;
+        int onlineCount = 0;
 
         std::set<uint16_t> freeIds;
         uint32_t nextId = 1;
@@ -31,8 +32,11 @@ namespace lightnerx::network {
         ConnectionManager(int initialReserve, int maxCapacity);
 
         ConnectionManager(const ConnectionManager&) = default;
-        ConnectionManager(ConnectionManager&&) = default;
-        ConnectionManager& operator=(ConnectionManager&&) = default;
+        ConnectionManager(ConnectionManager&& other) noexcept(
+            std::is_nothrow_default_constructible_v<decltype(clients)> &&
+            std::is_nothrow_default_constructible_v<decltype(clientIds)> &&
+            std::is_nothrow_default_constructible_v<decltype(freeIds)>);
+        ConnectionManager& operator=(ConnectionManager&& other) noexcept;
 
         ConnectionManager& operator=(const ConnectionManager& other);
 

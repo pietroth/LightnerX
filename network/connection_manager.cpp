@@ -15,7 +15,28 @@ ConnectionManager::ConnectionManager(int initialReserve, int maxCapacity) {
     }
     this->maxCapacity = std::min(maxCapacity, static_cast<int>(maxId));
     clients.reserve(std::min(initialReserve, this->maxCapacity) + 1);
-    onlineCount = 0;
+}
+
+ConnectionManager::ConnectionManager(ConnectionManager&& other) noexcept(
+    std::is_nothrow_default_constructible_v<decltype(clients)> &&
+    std::is_nothrow_default_constructible_v<decltype(clientIds)> &&
+    std::is_nothrow_default_constructible_v<decltype(freeIds)>) {
+    *this = std::move(other);
+}
+
+ConnectionManager& ConnectionManager::operator=(ConnectionManager&& other) noexcept {
+    if (this != &other) {
+        clients = std::move(other.clients);
+        clientIds = std::move(other.clientIds);
+        maxCapacity = other.maxCapacity;
+        onlineCount = std::exchange(other.onlineCount, 0);
+        freeIds = std::move(other.freeIds);
+        nextId = std::exchange(other.nextId, 1);
+        other.clients.clear();
+        other.clientIds.clear();
+        other.freeIds.clear();
+    }
+    return *this;
 }
 
 ConnectionManager& ConnectionManager::operator=(const ConnectionManager& other) {
@@ -74,7 +95,7 @@ std::optional<uint16_t> ConnectionManager::add(HSteamNetConnection hConn) {
 }
 
 void ConnectionManager::remove(int id) {
-    if (id <= 0 || id >= clients.size()) {
+    if (id <= 0 || static_cast<std::size_t>(id) >= clients.size()) {
         return;
     }
 
