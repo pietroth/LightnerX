@@ -377,7 +377,7 @@ void forEach(const Callback& callback) const;
 
 `initialReserve` reserves storage space, and `maxCapacity` defines the maximum number of registered connections. `add` registers a handle and returns the assigned ID, or an empty `std::optional` when registration is not performed. `remove` unregisters the ID; closing the connection is handled by the networking component.
 
-Copying a manager produces independent registrations. Copy assignment provides the strong exception guarantee: if copying throws, the destination's mappings, count, capacity and ID allocation state remain unchanged.
+Copying a manager produces independent registrations. If copy assignment throws, the destination preserves its mappings, count, capacity and ID allocation state. A successful move transfers the registrations and ID allocation state. The source becomes empty, retains its configured maximum capacity and starts assigning IDs at 1 again.
 
 `getHSteamNetConnection` looks up a handle by its internal ID and returns `0` when there is no handle at that position. `getClientId` looks up the ID in this manager's local registration map, independently of GNS userdata or whether the handle has since closed. `getOnlineCount` returns the number of active registrations.
 
