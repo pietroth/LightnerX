@@ -17,10 +17,14 @@ jobs:
       matrix:
         compiler: [gcc, clang]
         configuration: [Debug, Release]
+        linkage: [default]
         include:
           - compiler: gcc
             configuration: Debug
             sanitizers: address,undefined
+          - compiler: gcc
+            configuration: Release
+            linkage: shared-lightnerx-static-gns
     steps:
       - name: Install toolchain and dependencies
         run: |
@@ -38,13 +42,18 @@ jobs:
           COMPILER: ${{ matrix.compiler }}
           CONFIGURATION: ${{ matrix.configuration }}
           SANITIZERS: ${{ matrix.sanitizers }}
+          LINKAGE: ${{ matrix.linkage }}
         run: |
           if [ "$COMPILER" = gcc ]; then
             export CC=gcc-14 CXX=g++-14
           else
             export CC=clang-19 CXX=clang++-19
           fi
-          cmake -S . -B build/ci -G Ninja -DCMAKE_BUILD_TYPE="$CONFIGURATION" -DLIGHTNERX_BUILD_TESTS=ON -DLIGHTNERX_SANITIZERS="$SANITIZERS"
+          linkage_options=()
+          if [ "$LINKAGE" = shared-lightnerx-static-gns ]; then
+            linkage_options=(-DLIGHTNERX_BUILD_SHARED=ON -DBUILD_SHARED_LIB=OFF -DBUILD_STATIC_LIB=ON)
+          fi
+          cmake -S . -B build/ci -G Ninja -DCMAKE_BUILD_TYPE="$CONFIGURATION" -DLIGHTNERX_BUILD_TESTS=ON -DLIGHTNERX_SANITIZERS="$SANITIZERS" "${linkage_options[@]}"
       - name: Build
         run: cmake --build build/ci --parallel 2
       - name: Test
@@ -55,7 +64,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: linux-${{ matrix.compiler }}-${{ matrix.configuration }}
+          name: linux-${{ matrix.compiler }}-${{ matrix.configuration }}-${{ matrix.linkage }}
           path: |
             build/ci/results.xml
             build/ci/tests.log
