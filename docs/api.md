@@ -498,7 +498,7 @@ zeus::expected<void, std::error_code> flushAll(
 );
 ```
 
-`initMessagesBatcher` reserves space in the batcher's shared queue. Call it before queuing, with the number of messages you want to be able to keep pending; this reservation does not empty an existing queue.
+`initMessagesBatcher` reserves space in the batcher's shared queue. Call it before queuing with the number of messages you want to be able to keep pending. The first access constructs the queue, including when a consumer reserves capacity before `main()`. Reserving preserves pending messages. A negative capacity throws `std::invalid_argument`.
 
 `queueMessage` receives an `OutboundMessage` by value and moves it into the queue. The message allocated by the converter is retained, without allocating another message or copying the bytes. If the reserved capacity is occupied, it releases the received message and returns `std::errc::not_enough_memory`. If `message.message` is null, it returns `std::errc::invalid_argument` without queuing.
 
