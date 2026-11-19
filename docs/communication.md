@@ -179,7 +179,7 @@ Callbacks run during the interpretation call. The header is delivered by value, 
 The usual flow is:
 
 1. Initialize the network and call `initMessagesBatcher(capacity)` before queuing the first message.
-2. Construct the header with the total message size.
+2. Compute the total size of the header and payload. For an Event or Response, encode the first field as `(totalSize << 1) | typeBit`, with bit 0 for an Event and bit 1 for a Response. For an Intention or Notification, use the total size directly.
 3. Create a `lightnerx::network::Target`.
 4. Use the corresponding converter to obtain a `lightnerx::network::OutboundMessage`.
 5. Pass the object to `queueMessage(std::move(outbound))`, transferring ownership of the message and destination.
