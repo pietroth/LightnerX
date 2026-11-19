@@ -1,3 +1,13 @@
+#ifdef _WIN32
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <winsock2.h>
+#include <ws2tcpip.h>
+#else
+#include <arpa/inet.h>
+#endif
+
 #include <lightnerx/network/client.hpp>
 
 #include <cstddef>
@@ -46,6 +56,7 @@ zeus::expected<void, std::error_code> Client::start() {
         );
     }
 
+    const bool networkWasInitialized = isNetworkInitialized();
     if (auto acquired = detail::acquireNetworkOwner(this); !acquired) return acquired;
 
     m_sockets = SteamNetworkingSockets();
@@ -56,7 +67,6 @@ zeus::expected<void, std::error_code> Client::start() {
         return zeus::unexpected(
             std::make_error_code(std::errc::io_error)
         );
-    const bool networkWasInitialized = isNetworkInitialized();
     }
 
     s_callbackInstance = this;
@@ -73,21 +83,26 @@ zeus::expected<void, std::error_code> Client::connect(std::string_view ip, int p
         return zeus::unexpected(std::make_error_code(std::errc::already_connected));
     }
 
-    if (ip.empty() || port < 1 || port > 65535) {
+    if (ip.empty() || ip.find('\0') != std::string_view::npos || port < 1 || port > 65535) {
         return zeus::unexpected(std::make_error_code(std::errc::invalid_argument));
     }
 
     SteamNetworkingIPAddr address{};
 
-    const std::string ip_string{ip};
-
-    if (!address.ParseString(ip_string.c_str())) {
+    const bool bracketed = ip.size() >= 2 && ip.front() == '[' && ip.back() == ']';
+    const std::string literal{bracketed ? ip.substr(1, ip.size() - 2) : ip};
+    in_addr ipv4{};
+    in6_addr ipv6{};
+    const auto destinationPort = static_cast<uint16>(port);
+    if (!bracketed && inet_pton(AF_INET, literal.c_str(), &ipv4) == 1) {
+        address.SetIPv4(ntohl(ipv4.s_addr), destinationPort);
+    } else if (inet_pton(AF_INET6, literal.c_str(), &ipv6) == 1) {
+        address.SetIPv6(ipv6.s6_addr, destinationPort);
+    } else {
         return zeus::unexpected(
             std::make_error_code(std::errc::invalid_argument)
         );
     }
-
-    address.m_port = static_cast<uint16>(port);
 
     SteamNetworkingConfigValue_t option{};
 
