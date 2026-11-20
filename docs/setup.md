@@ -1,6 +1,6 @@
 # Setup
 
-LightnerX is a static C++ library. The project provides the `LightnerX` target and does not have its own executable.
+The `LightnerX` target builds a static library by default.
 
 ## GameNetworkingSockets
 
@@ -24,6 +24,17 @@ libraries without a C++26 `std` module are not supported by this configuration.
 cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug
 cmake --build build --parallel 2
 ```
+
+### Linking applications and plugins
+
+Use the default static library in a single executable. If multiple plugins use
+networking in one process, configure with `-DLIGHTNERX_BUILD_SHARED=ON` and link
+every plugin to the same shared LightnerX library. This gives all importers one
+network owner and one outbound queue. Embedding separate static copies creates
+independent runtime state.
+
+LightnerX links the shared GameNetworkingSockets target when available. To use
+its static target, configure with `-DBUILD_SHARED_LIB=OFF -DBUILD_STATIC_LIB=ON`.
 
 ## Consuming with CMake
 

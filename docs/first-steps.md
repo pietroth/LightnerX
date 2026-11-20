@@ -1,6 +1,6 @@
 # First steps
 
-This guide shows the essential flow for setting up a server and a client. The examples use LightnerX components directly and leave the execution model to the application. The two programs illustrate separate consuming applications; the library remains a static library.
+This guide shows the essential flow for setting up a server and a client. The examples use LightnerX components directly and leave the execution model to the application. Run the server and client as separate applications.
 
 ## Server
 
