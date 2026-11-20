@@ -10,9 +10,11 @@ The server receives bytes from clients, forwards those bytes to `MessageInterpre
 
 ```cpp
 
+#include <chrono>
 #include <cstddef>
 #include <cstdint>
 #include <iostream>
+#include <thread>
 #include <type_traits>
 #include <variant>
 #include <string_view>
@@ -89,6 +91,7 @@ int main() {
             std::cout << "Update failed: " << lightnerx::errorMessage(updated.error()) << '\n';
             break;
         }
+        std::this_thread::sleep_for(std::chrono::milliseconds{1});
     }
 
     server.close();
@@ -106,8 +109,10 @@ The client forwards bytes received from the server to the `authorityInterpret` m
 
 ```cpp
 
+#include <chrono>
 #include <cstddef>
 #include <iostream>
+#include <thread>
 #include <type_traits>
 #include <variant>
 #include <string_view>
@@ -116,6 +121,7 @@ The client forwards bytes received from the server to the `authorityInterpret` m
 #include <lightnerx/communication/message.hpp>
 #include <lightnerx/communication/response.hpp>
 #include <lightnerx/network/client.hpp>
+#include <lightnerx/network/connection_handle.hpp>
 
 int main() {
     lightnerx::network::Client client;
@@ -157,17 +163,28 @@ int main() {
         return 1;
     }
 
+    const auto connectDeadline = std::chrono::steady_clock::now() + std::chrono::seconds{5};
+    bool connectedOnce = false;
     while (true) {
         if (const auto updated = client.update(1); !updated) {
             std::cout << "Update failed: " << lightnerx::errorMessage(updated.error()) << '\n';
-            break;
+            return 1;
         }
+        if (client.getServerHConn() == lightnerx::network::k_invalidConnection) {
+            std::cout << (connectedOnce ? "Connection closed\n" : "Connection attempt failed\n");
+            return connectedOnce ? 0 : 1;
+        }
+        connectedOnce = connectedOnce || client.isConnected();
+        if (!connectedOnce && std::chrono::steady_clock::now() >= connectDeadline) {
+            std::cout << "Connection attempt timed out\n";
+            return 1;
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds{1});
     }
-    return 1;
 }
 ```
 
-`connect()` initiates the connection, and `update()` processes network callbacks and available messages. `isConnected()` can be used to query the state observed by the client.
+`connect()` starts the connection attempt. The client calls `update()` until it observes an established connection, a closed handle, or the application's five-second deadline. An update that processes a peer closure can clear the handle and return success. The loop therefore checks `getServerHConn()` after every update. In this example, the end of an established session exits with status 0. A failed attempt or update exits with status 1. The client destructor releases the runtime on exit.
 
 ## Execution model
 
