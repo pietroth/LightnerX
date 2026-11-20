@@ -6,7 +6,7 @@ import sys
 
 actual = subprocess.check_output([sys.argv[1]], text=True, timeout=30)
 expected = pathlib.Path(sys.argv[2]).read_text()
-# Normalize the historical Linux errno values. The executable checks std::errc.
+# Normalize the historical Linux errno values. The executable checks LightnerX error codes.
 error_labels = {'0': 'success', '107': 'not_connected', '22': 'invalid_argument',
                 '11': 'resource_unavailable_try_again'}
 expected_lines = expected.splitlines(keepends=True)

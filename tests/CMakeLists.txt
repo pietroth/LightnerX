@@ -1,6 +1,6 @@
 foreach(test_name IN ITEMS connection_manager connection_manager_assignment messages lifecycle)
     add_executable(lightnerx_test_${test_name} ${test_name}.cpp)
-    target_link_libraries(lightnerx_test_${test_name} PRIVATE LightnerX)
+    target_link_libraries(lightnerx_test_${test_name} PRIVATE LightnerX ${lightnerx_gns_target})
     # Keep assertions enabled even in Release/RelWithDebInfo configurations.
     if(MSVC)
         target_compile_options(lightnerx_test_${test_name} PRIVATE /UNDEBUG)
@@ -17,7 +17,7 @@ if(NOT CMAKE_CXX_COMPILER_ID MATCHES "^(GNU|Clang|AppleClang)$" OR MSVC)
     message(FATAL_ERROR "LightnerX regression tests require a GCC- or Clang-compatible compiler driver")
 endif()
 add_executable(lightnerx_test_characterization characterization.cpp)
-target_link_libraries(lightnerx_test_characterization PRIVATE LightnerX)
+target_link_libraries(lightnerx_test_characterization PRIVATE LightnerX ${lightnerx_gns_target})
 add_test(NAME lightnerx.characterization
     COMMAND ${Python3_EXECUTABLE} "${CMAKE_CURRENT_SOURCE_DIR}/characterization.py"
         "$<TARGET_FILE:lightnerx_test_characterization>"
@@ -57,6 +57,7 @@ add_custom_command(OUTPUT "${lifecycle_fault_source}"
     COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/lifecycle_faults.py"
         --output "${lifecycle_fault_source}"
     DEPENDS lifecycle_faults.py source_support.py ${lifecycle_fault_headers}
+        "${PROJECT_SOURCE_DIR}/include/lightnerx/Result.hpp"
         "${PROJECT_SOURCE_DIR}/network/client.cpp"
         "${PROJECT_SOURCE_DIR}/network/server.cpp"
         "${PROJECT_SOURCE_DIR}/network/network_manager.cpp"
@@ -65,9 +66,7 @@ add_executable(lightnerx_test_lifecycle_faults "${lifecycle_fault_source}")
 # The source defines the wrappers itself. On shared builds it must not import them.
 target_link_libraries(lightnerx_test_lifecycle_faults PRIVATE ${lightnerx_gns_target})
 target_include_directories(lightnerx_test_lifecycle_faults PRIVATE
-    "${PROJECT_SOURCE_DIR}/external/span/include"
-    "${PROJECT_SOURCE_DIR}/external/expected/include")
-target_compile_definitions(lightnerx_test_lifecycle_faults PRIVATE TCB_SPAN_TERMINATE_ON_CONTRACT_VIOLATION)
+    "${PROJECT_SOURCE_DIR}/include")
 if(LIGHTNERX_SANITIZERS)
     target_compile_options(lightnerx_test_lifecycle_faults PRIVATE
         "-fsanitize=${LIGHTNERX_SANITIZERS}" -fno-omit-frame-pointer -fno-sanitize-recover=all)
@@ -175,4 +174,5 @@ foreach(header IN LISTS lightnerx_public_headers)
     list(APPEND header_checks "${check_source}")
 endforeach()
 add_library(lightnerx_header_checks OBJECT ${header_checks})
-target_link_libraries(lightnerx_header_checks PRIVATE LightnerX)
+target_include_directories(lightnerx_header_checks PRIVATE "${PROJECT_SOURCE_DIR}/include")
+target_compile_options(lightnerx_header_checks PRIVATE -fno-exceptions -pedantic-errors)

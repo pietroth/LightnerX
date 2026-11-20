@@ -1,58 +1,63 @@
 # C++17 byte views and results
 
-## Byte views with span
+## Binary buffers with string_view
 
-Include `<tcb/span.hpp>` for `tcb::span`. A span refers to contiguous elements owned elsewhere. Copying the view leaves ownership with the original buffer. Receive callback views expire after dispatch. Copy the bytes during the callback if you need to retain them.
+Include `<string_view>` for `std::string_view`. Construct a binary view with a pointer and an explicit byte count to preserve embedded zero bytes. The view borrows the original buffer. Copy the bytes inside a receive callback if you need them after the callback returns. Message converters copy the bytes into their own buffer.
 
-Construct the view from a contiguous container, an array, or a pointer and count. For a slice previously built from container iterators, pass a pointer and the element count. Use `std::size_t{0}` for a zero count to disambiguate the pointer-and-count constructor from the pointer-pair constructor. The backport has no `.at()` member, so check a dynamic index against `size()` before accessing it. The CMake target propagates one contract policy across translation units. A contract violation terminates the program in both Debug and Release. Use `first`, `last` and `subspan` to select a slice, and `tcb::as_bytes` to view its object representation.
+To use a trivially copyable struct as a payload, wrap its object representation. Both peers need the same layout and byte order. Serialize individual fields when the protocol needs to work across different layouts.
 
 ```cpp
-#include <array>
 #include <cassert>
-#include <cstddef>
-#include <tcb/span.hpp>
+#include <cstdint>
+#include <cstring>
+#include <string_view>
+#include <type_traits>
+
+struct Payload {
+    std::uint32_t id;
+};
 
 int main() {
-    std::array<int, 3> values{10, 20, 30};
-    tcb::span<int, 3> all{values};
-    const tcb::span<const int> empty{values.data(), std::size_t{0}};
-    assert(empty.empty());
-    auto tail = all.subspan<1>();
-    static_assert(decltype(tail)::extent == 2);
-    tail[0] = 25;
-    assert(values[1] == 25);
-    const auto bytes = tcb::as_bytes(all);
-    assert(bytes.size() == values.size() * sizeof(int));
+    static_assert(std::is_trivially_copyable_v<Payload>);
+    const Payload original{42};
+    const std::string_view bytes{
+        reinterpret_cast<const char*>(&original), sizeof(original)
+    };
+
+    Payload received{};
+    if (bytes.size() != sizeof(received)) return 1;
+    std::memcpy(&received, bytes.data(), sizeof(received));
+    assert(received.id == original.id);
 }
 ```
 
-For the complete interface and bounds-checking options, see [tcbrindle/span](https://github.com/tcbrindle/span).
+## Results
 
-## Results with expected
+Include `<lightnerx/Result.hpp>` for `lightnerx::Result<T, E>` and `lightnerx::ErrorCode`. The default error type is `ErrorCode`. Construct a success from a value, or use `{}` for a successful `Result<void>`. To construct an error, call `Result<T, E>::failure(...)`.
 
-Include `<zeus/expected.hpp>` for `zeus::expected<T, E>` and `zeus::unexpected<E>`. LightnerX uses `zeus::expected<void, std::error_code>` for operations that return no value on success. Use `if (!result)` before reading `result.error()`. Calling `value()` on an error throws `zeus::bad_expected_access<E>` when exceptions are enabled.
+Use `if (result)` or `has_value()` to check the outcome before calling `value()` or `error()`. Accessing the inactive alternative terminates the process. `lightnerx::errorMessage(code)` describes a library error code.
 
 ```cpp
 #include <cassert>
 #include <limits>
-#include <string>
-#include <zeus/expected.hpp>
+#include <lightnerx/Result.hpp>
 
-zeus::expected<int, std::string> divide(int numerator, int denominator) {
-    if (denominator == 0) return zeus::unexpected(std::string("zero denominator"));
-    if (numerator == std::numeric_limits<int>::min() && denominator == -1)
-        return zeus::unexpected(std::string("quotient out of range"));
+lightnerx::Result<int> divide(int numerator, int denominator) {
+    if (denominator == 0 ||
+        (numerator == std::numeric_limits<int>::min() && denominator == -1)) {
+        return lightnerx::Result<int>::failure(lightnerx::ErrorCode::InvalidArgument);
+    }
     return numerator / denominator;
 }
 
 int main() {
-    auto result = divide(12, 3).transform([](int value) { return value * 2; });
-    assert(result && result.value() == 8);
-    auto recovered = divide(1, 0).or_else([](const std::string&) {
-        return zeus::expected<int, std::string>(0);
-    });
-    assert(recovered == 0);
+    const auto quotient = divide(12, 3);
+    assert(quotient.has_value() && quotient.value() == 4);
+    const auto invalid = divide(1, 0);
+    assert(!invalid && invalid.error() == lightnerx::ErrorCode::InvalidArgument);
+
+    const lightnerx::Result<void> done;
+    assert(done);
+    done.value();
 }
 ```
-
-For the full interface and supported compiler versions, see [zeus-cpp/expected](https://github.com/zeus-cpp/expected/tree/v1.4.0).

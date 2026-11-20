@@ -1,7 +1,7 @@
-#include <steam/steamnetworkingsockets.h>
-
 #include <type_traits>
 #include <array>
+#include <memory>
+#include <utility>
 #include <lightnerx/network/server.hpp>
 #include <lightnerx/communication/response.hpp>
 #include <lightnerx/network/client.hpp>
@@ -9,11 +9,7 @@
 #include <lightnerx/network/message_batch.hpp>
 #include <lightnerx/network/connection_manager.hpp>
 
-#ifndef TCB_SPAN_TERMINATE_ON_CONTRACT_VIOLATION
-#error "The LightnerX target must propagate the span contract policy to consumers"
-#endif
-
-static_assert(lightnerx::network::k_invalidConnection == k_HSteamNetConnection_Invalid);
+static_assert(lightnerx::network::k_invalidConnection == 0);
 static_assert(!std::is_copy_constructible_v<lightnerx::network::Client>);
 
 const void* producerStateAddress();
@@ -21,6 +17,18 @@ std::array<const void*, 8> producerConstantAddresses();
 bool queueFromProducer();
 
 int main() {
+    using lightnerx::Result;
+    const Result<int, int> success = 7;
+    const auto failure = Result<int, int>::failure(42);
+    if (!success || success.value() != 7 || failure || failure.error() != 42) return 9;
+
+    Result<std::unique_ptr<int>> movable = std::make_unique<int>(17);
+    auto value = std::move(movable).value();
+    if (!value || *value != 17) return 10;
+
+    const auto customError = Result<void, std::unique_ptr<int>>::failure(std::make_unique<int>(23));
+    if (customError || *customError.error() != 23) return 11;
+
     lightnerx::network::Client client;
     namespace network = lightnerx::network;
     namespace communication = lightnerx::communication;
@@ -38,7 +46,7 @@ int main() {
     network::ConnectionManager connections(0, 0);
     // The invalid destination proves the other translation unit used this queue.
     const auto flushed = network::flushAll(connections);
-    if (flushed || flushed.error() != std::errc::not_connected) return 5;
+    if (flushed || flushed.error() != lightnerx::ErrorCode::NotConnected) return 5;
     if (!network::flushAll(connections)) return 6;
     network::networkKill();
     return network::isNetworkInitialized() ? 7 : 0;

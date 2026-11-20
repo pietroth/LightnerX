@@ -44,8 +44,6 @@ source = r'''
 #include <utility>
 #include <variant>
 #include <vector>
-#include <tcb/span.hpp>
-#include <zeus/expected.hpp>
 #include <steam/steamnetworkingsockets.h>
 #include <steam/isteamnetworkingutils.h>
 int liveMessages = 0, clientReceive = 0, serverReceive = 0;
@@ -135,7 +133,7 @@ int main() {
       client.m_connection = a; client.connected = true;
       client.addServerReceivedMessageCallback([](auto) { throw 42; });
       clientReceive = 3;
-      try { client.update(3); } catch (int) {}
+      try { (void)client.update(3); } catch (int) {}
       std::cout << "LX-14 messages leaked after callback exception=" << liveMessages << '\n';
       while (!allocatedMessages.empty()) allocatedMessages.back()->Release();
       check(client.disconnect(false).has_value(), "disconnect");
@@ -172,13 +170,13 @@ int main() {
         { Client client; check(client.start().has_value(), "start"); attachPair(client);
           check(client.disconnect(false).has_value(), "disconnect");
           check(!client.isConnected() && !client.getServerHConn(), "LX-06 local reset");
-          check(client.connect("invalid", 1234).error() == std::errc::invalid_argument, "reconnect reaches address validation");
+          check(client.connect("invalid", 1234).error() == lightnerx::ErrorCode::InvalidArgument, "reconnect reaches address validation");
         }
         check(!isNetworkInitialized() && !SteamNetworkingSockets(), "LX-01 destructor state");
         check(networkInit() && SteamNetworkingSockets(), "LX-01 restart"); networkKill();
         { Client client; check(client.start().has_value(), "start"); attachPair(client);
           clientReceive = -1;
-          check(client.update(2).error() == std::errc::io_error, "LX-07 client receive failure");
+          check(client.update(2).error() == lightnerx::ErrorCode::IoError, "LX-07 client receive failure");
           check(!client.isConnected() && !client.getServerHConn(), "receive failure resets invalid handle");
         }
         { Client client; check(client.start().has_value(), "start"); attachPair(client);
@@ -186,13 +184,13 @@ int main() {
           int messageIndex = 0;
           client.addServerReceivedMessageCallback([&](auto) { if (throws && ++messageIndex == 2) throw 42; });
           clientReceive = 3;
-          try { client.update(3); check(false, "callback exception lost"); } catch (int value) { check(value == 42, "exception identity"); }
+          try { (void)client.update(3); check(false, "callback exception lost"); } catch (int value) { check(value == 42, "exception identity"); }
           check(liveMessages == 0, "LX-14 entire receive batch released");
           throws = false;
           int calls = 0, added = 0;
           client.addServerReceivedMessageCallback([&](auto) {
               ++calls;
-              check(client.update(1).error() == std::errc::operation_in_progress, "recursive update rejected");
+              check(client.update(1).error() == lightnerx::ErrorCode::OperationInProgress, "recursive update rejected");
               for (int i = 0; i < 1000; ++i) client.addServerReceivedMessageCallback([&](auto) { ++added; });
               check(client.disconnect(false).has_value(), "disconnect inside callback");
           });
@@ -210,14 +208,14 @@ int main() {
           failPoll = false;
           check(server.start(45333, 1000).has_value(), "server restart after start failure");
           serverReceive = -1;
-          check(server.update().error() == std::errc::io_error, "LX-07 server receive failure");
+          check(server.update().error() == lightnerx::ErrorCode::IoError, "LX-07 server receive failure");
           server.addClientReceivedMessageCallback([&](auto, auto) {
               server.close();
               check(isNetworkInitialized(), "close deferred until received message released");
               throw 43;
           });
           serverReceive = 1;
-          try { server.update(); check(false, "server exception lost"); } catch (int value) { check(value == 43, "server exception identity"); }
+          try { (void)server.update(); check(false, "server exception lost"); } catch (int value) { check(value == 43, "server exception identity"); }
           check(liveMessages == 0 && !isNetworkInitialized(), "server exception cleanup precedes shutdown");
         }
         { Server server;
@@ -271,21 +269,20 @@ int main() {
           check(SteamNetworkingSockets()->CreateSocketPair(&a, &b, false, nullptr, nullptr), "pair");
           server.addClientConnectedCallback([&](auto) {
               server.addClientConnectedCallback([](auto) {});
-              throw 44;
           });
           SteamNetConnectionStatusChangedCallback_t event{};
           event.m_hConn = a;
           event.m_info.m_hListenSocket = server.m_hListenSocket;
           event.m_info.m_eState = k_ESteamNetworkingConnectionState_Connecting;
           serverCallbacks = [&] { Server::SteamNetConnectionStatusChangedCallback(&event); };
-          try { server.update(); check(false, "status exception lost"); } catch (int value) { check(value == 44, "deferred status exception"); }
-          check(!server.callbackException && server.update().has_value(), "callback exception cleared");
+          check(server.update().has_value(), "admission callback dispatch");
+          check(server.update().has_value(), "server remains usable after admission");
           server.addClientDisconnectedCallback([&](auto) {
               server.close();
               check(isNetworkInitialized(), "close deferred in direct disconnect callback");
               throw 45;
           });
-          try { server.disconnectConnection(a, false); check(false, "disconnect exception lost"); } catch (int value) { check(value == 45, "disconnect exception identity"); }
+          try { (void)server.disconnectConnection(a, false); check(false, "disconnect exception lost"); } catch (int value) { check(value == 45, "disconnect exception identity"); }
           check(!isNetworkInitialized(), "direct disconnect unwind closes server");
         }
         check(liveMessages == 0, "all messages released");

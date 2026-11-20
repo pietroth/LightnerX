@@ -33,8 +33,6 @@ else()
     add_library(LightnerX STATIC)
 endif()
 target_compile_features(LightnerX PUBLIC cxx_std_17)
-# Public span instantiations must use the same contracts, regardless of NDEBUG.
-target_compile_definitions(LightnerX PUBLIC TCB_SPAN_TERMINATE_ON_CONTRACT_VIOLATION)
 
 set(LIGHTNERX_SANITIZERS "" CACHE STRING "Sanitizers for LightnerX and consumers, e.g. address or address,undefined")
 if(LIGHTNERX_SANITIZERS)
@@ -58,13 +56,8 @@ target_include_directories(LightnerX
         ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
 
-target_include_directories(LightnerX SYSTEM PUBLIC
-    ${CMAKE_CURRENT_SOURCE_DIR}/external/span/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/external/expected/include
-)
-
 target_link_libraries(LightnerX
-    PUBLIC
+    PRIVATE
         ${lightnerx_gns_target}
 )
 

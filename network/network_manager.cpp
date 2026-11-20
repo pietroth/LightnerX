@@ -1,7 +1,7 @@
 #include <lightnerx/network/network_manager.hpp>
 
-#include <zeus/expected.hpp>
-#include <system_error>
+#include <steam/steamnetworkingsockets.h>
+
 
 namespace lightnerx::network::detail {
     const void* networkOwner = nullptr;
@@ -43,12 +43,12 @@ namespace lightnerx::network {
             networkCleanup = cleanup;
         }
 
-        zeus::expected<void, std::error_code> acquireNetworkOwner(const void* owner) {
+        Result<void> acquireNetworkOwner(const void* owner) {
             if (networkOwner) {
-                return zeus::unexpected(std::make_error_code(std::errc::device_or_resource_busy));
+                return Result<void>::failure(ErrorCode::DeviceOrResourceBusy);
             }
             if (!networkInit()) {
-                return zeus::unexpected(std::make_error_code(std::errc::io_error));
+                return Result<void>::failure(ErrorCode::IoError);
             }
             networkOwner = owner;
             return {};

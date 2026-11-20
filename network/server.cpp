@@ -1,12 +1,10 @@
 #include <lightnerx/network/server.hpp>
 
+#include <steam/steamnetworkingsockets.h>
+
 #include <cstddef>
 #include <cstdint>
-#include <exception>
-#include <zeus/expected.hpp>
 #include <memory>
-#include <system_error>
-#include <utility>
 
 namespace lightnerx::network {
 
@@ -24,12 +22,12 @@ void Server::addClientReceivedMessageCallback(ClientReceivedMessageCallback call
     clientReceivedMessageCallbacks.push_back(callback);
 }
 
-zeus::expected<void, std::error_code> Server::start(int port, uint32_t timeoutConnected) {
+Result<void> Server::start(int port, std::uint32_t timeoutConnected) {
     if (m_pInterface) {
-        return zeus::unexpected(std::make_error_code(std::errc::operation_in_progress));
+        return Result<void>::failure(ErrorCode::OperationInProgress);
     }
     if (port < 1 || port > 65535 || timeoutConnected > INT32_MAX) {
-        return zeus::unexpected(std::make_error_code(std::errc::invalid_argument));
+        return Result<void>::failure(ErrorCode::InvalidArgument);
     }
     const bool networkWasInitialized = isNetworkInitialized();
     if (auto acquired = detail::acquireNetworkOwner(this); !acquired) return acquired;
@@ -37,10 +35,9 @@ zeus::expected<void, std::error_code> Server::start(int port, uint32_t timeoutCo
     m_pInterface = SteamNetworkingSockets();
     if (!m_pInterface) {
         detail::releaseNetworkOwner(this, !networkWasInitialized);
-        return zeus::unexpected(std::make_error_code(std::errc::io_error));
+        return Result<void>::failure(ErrorCode::IoError);
     }
     closeRequested = false;
-    callbackException = nullptr;
 
     SteamNetworkingIPAddr address;
     address.Clear();
@@ -68,25 +65,25 @@ zeus::expected<void, std::error_code> Server::start(int port, uint32_t timeoutCo
 
     if (m_hListenSocket == k_invalidSocket) {
         closeResources(!networkWasInitialized);
-        return zeus::unexpected(std::make_error_code(std::errc::resource_unavailable_try_again));
+        return Result<void>::failure(ErrorCode::ResourceUnavailableTryAgain);
     }
 
     m_hPollGroup = m_pInterface->CreatePollGroup();
 
     if (m_hPollGroup == k_invalidPollGroup) {
         closeResources(!networkWasInitialized);
-        return zeus::unexpected(std::make_error_code(std::errc::resource_unavailable_try_again));
+        return Result<void>::failure(ErrorCode::ResourceUnavailableTryAgain);
     }
 
     return {};
 }
 
-zeus::expected<void, std::error_code> Server::update() {
+Result<void> Server::update() {
     if (!m_pInterface) {
-        return zeus::unexpected(std::make_error_code(std::errc::not_connected));
+        return Result<void>::failure(ErrorCode::NotConnected);
     }
     if (updating || activeCalls != 0) {
-        return zeus::unexpected(std::make_error_code(std::errc::operation_in_progress));
+        return Result<void>::failure(ErrorCode::OperationInProgress);
     }
     ActiveCall active{*this};
     updating = true;
@@ -95,9 +92,6 @@ zeus::expected<void, std::error_code> Server::update() {
         ~UpdateGuard() { flag = false; }
     } updateGuard{updating};
     m_pInterface->RunCallbacks();
-    if (callbackException) {
-        std::rethrow_exception(std::exchange(callbackException, nullptr));
-    }
     if (closeRequested) return {};
 
     ISteamNetworkingMessage* message = nullptr;
@@ -111,14 +105,14 @@ zeus::expected<void, std::error_code> Server::update() {
     const auto release = [](ISteamNetworkingMessage* value) { if (value) value->Release(); };
     std::unique_ptr<ISteamNetworkingMessage, decltype(release)> ownedMessage(message, release);
     if (received < 0) {
-        return zeus::unexpected(std::make_error_code(std::errc::io_error));
+        return Result<void>::failure(ErrorCode::IoError);
     }
 
     if (received > 0) {
         const auto count = clientReceivedMessageCallbacks.size();
         for (std::size_t i = 0; i < count && !closeRequested; ++i) {
             clientReceivedMessageCallbacks[i]({
-                static_cast<const std::byte*>(message->m_pData),
+                static_cast<const char*>(message->m_pData),
                 static_cast<std::size_t>(message->m_cbSize)
                 },
                 message->m_conn
@@ -129,13 +123,11 @@ zeus::expected<void, std::error_code> Server::update() {
     return {};
 }
 
-zeus::expected<void, std::error_code> Server::disconnectConnection(
-            HSteamNetConnection hConn, bool enableLinger
+Result<void> Server::disconnectConnection(
+            ConnectionHandle hConn, bool enableLinger
         ) {
     if (!m_pInterface || closeRequested) {
-        return zeus::unexpected(
-            std::make_error_code(std::errc::not_connected)
-        );
+        return Result<void>::failure(ErrorCode::NotConnected);
     }
 
     ActiveCall active{*this};
@@ -147,9 +139,7 @@ zeus::expected<void, std::error_code> Server::disconnectConnection(
         nullptr,
         enableLinger
     )) {
-        return zeus::unexpected(
-            std::make_error_code(std::errc::io_error)
-        );
+        return Result<void>::failure(ErrorCode::IoError);
     }
 
     const auto count = clientDisconnectedCallbacks.size();
@@ -186,7 +176,6 @@ void Server::closeResources(bool shutdown) noexcept {
     m_pInterface = nullptr;
     if (s_pCallbackInstance == this) s_pCallbackInstance = nullptr;
     closeRequested = false;
-    callbackException = nullptr;
 
     detail::releaseNetworkOwner(this, shutdown);
 }
@@ -196,18 +185,13 @@ void Server::SteamNetConnectionStatusChangedCallback(
             ) noexcept {
     auto* instance = s_pCallbackInstance;
     if (instance != nullptr && !instance->closeRequested) {
-        try {
-            instance->OnConnectionStatusChanged(pInfo);
-        } catch (...) {
-            // Never unwind through GNS. update() rethrows after RunCallbacks.
-            if (!instance->callbackException) instance->callbackException = std::current_exception();
-        }
+        instance->OnConnectionStatusChanged(pInfo);
     }
 }
 
 void Server::OnConnectionStatusChanged(SteamNetConnectionStatusChangedCallback_t* pInfo) {
     if (!pInfo || pInfo->m_info.m_hListenSocket != m_hListenSocket) return;
-    HSteamNetConnection hConn = pInfo->m_hConn;
+    ConnectionHandle hConn = pInfo->m_hConn;
     SteamNetConnectionInfo_t info = pInfo->m_info;
 
     switch (info.m_eState) {
@@ -246,7 +230,7 @@ void Server::OnConnectionStatusChanged(SteamNetConnectionStatusChangedCallback_t
 
         case k_ESteamNetworkingConnectionState_ClosedByPeer:
         case k_ESteamNetworkingConnectionState_ProblemDetectedLocally : {
-            const HSteamNetConnection hConn = pInfo->m_hConn;
+            const ConnectionHandle hConn = pInfo->m_hConn;
             if (!m_pInterface->CloseConnection(hConn, 0, nullptr, false)) break;
 
             const auto count = clientDisconnectedCallbacks.size();

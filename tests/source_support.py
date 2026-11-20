@@ -7,13 +7,11 @@ the module-era tests. The ordinary C++ tests link the unmodified library.
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-INCLUDE_FLAGS = ['-DTCB_SPAN_TERMINATE_ON_CONTRACT_VIOLATION'] + [
+INCLUDE_FLAGS = [
     '-I' + str(ROOT / directory)
     for directory in (
         'include',
         'external/GameNetworkingSockets/include',
-        'external/span/include',
-        'external/expected/include',
     )
 ]
 
@@ -23,7 +21,10 @@ def body(path, *, steam=True):
     lines = []
     for file in files:
         for line in file.read_text().splitlines():
-            if line.startswith('#include <lightnerx/'):
+            if line.startswith('#include <lightnerx/') and line not in (
+                '#include <lightnerx/Result.hpp>',
+                '#include <lightnerx/network/connection_handle.hpp>',
+            ):
                 continue
             if not steam and line.startswith('#include') and 'steam/' in line:
                 continue

@@ -12,7 +12,6 @@
 #include <new>
 #include <optional>
 #include <iostream>
-#include <tcb/span.hpp>
 #include <stdexcept>
 #include <type_traits>
 #include <utility>
@@ -56,7 +55,7 @@ void check(bool condition, const char* description) {
 }
 
 void verifyMappings(const ConnectionManager& manager,
-                    tcb::span<const HSteamNetConnection> handles,
+                    const std::array<HSteamNetConnection, 12>& handles,
                     std::initializer_list<Registration> expected) {
     check(manager.getOnlineCount() == static_cast<int>(expected.size()), "registration count changed");
     for (std::uint16_t id = 0; id <= handles.size(); ++id) {
@@ -78,7 +77,7 @@ void verifyMappings(const ConnectionManager& manager,
     check(visits == expected.size(), "enumeration count changed");
 }
 
-void assignmentRegression(tcb::span<const HSteamNetConnection> handles) {
+void assignmentRegression(const std::array<HSteamNetConnection, 12>& handles) {
     ConnectionManager source(64, 6);
     for (std::uint16_t id = 1; id <= 4; ++id) {
         check(source.add(handles[id - 1]) == id, "source setup");
@@ -139,7 +138,7 @@ void assignmentRegression(tcb::span<const HSteamNetConnection> handles) {
     std::cout << "ConnectionManager assignment passed: " << failures << " allocation failures preserved state" << '\n';
 }
 
-void moveRegression(tcb::span<const HSteamNetConnection> handles) {
+void moveRegression(const std::array<HSteamNetConnection, 12>& handles) {
     ConnectionManager source(0, 2);
     check(source.add(handles[0]) == 1 && source.add(handles[1]) == 2, "move setup");
     source.remove(1);

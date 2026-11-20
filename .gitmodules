@@ -1,9 +1,3 @@
 [submodule "external/GameNetworkingSockets"]
 	path = external/GameNetworkingSockets
 	url = https://github.com/ValveSoftware/GameNetworkingSockets.git
-[submodule "external/span"]
-	path = external/span
-	url = https://github.com/tcbrindle/span.git
-[submodule "external/expected"]
-	path = external/expected
-	url = https://github.com/zeus-cpp/expected.git

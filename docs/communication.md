@@ -1,6 +1,6 @@
 # Communication and the INER protocol
 
-The examples use `tcb::span` for byte views and `zeus::expected` for results. See [C++17 byte views and results](cpp17-types.md).
+The examples use `std::string_view` for byte views and `lightnerx::Result` for results. See [C++17 byte views and results](cpp17-types.md).
 
 ## INER and LightnerX
 
@@ -129,7 +129,7 @@ Response: (total_size << 1) | 1
 
 The interpreter retrieves the size with `base >> 1` and distinguishes `Event` from `Response` with `base & 1`. In the headers delivered to the callback, `protocol.size` already contains the decoded size, without the type bit.
 
-Reception currently tolerates additional bytes in responses when the declared total matches the supplied span and the selected header is complete. For approved and failure responses, the interpreter ignores those bytes and delivers an empty payload. For denied and partially approved responses, it delivers all bytes after `UnsuccessfulResponse`, even though the recommended denied-response format has no payload. `protocol.size` still includes the complete received message, including any ignored bytes; it can therefore exceed the header size plus the delivered payload size. This reception behavior does not change the recommended emission formats. Converters copy the supplied payload without enforcing status-specific payload rules.
+Reception currently tolerates additional bytes in responses when the declared total matches the supplied view and the selected header is complete. For approved and failure responses, the interpreter ignores those bytes and delivers an empty payload. For denied and partially approved responses, it delivers all bytes after `UnsuccessfulResponse`, even though the recommended denied-response format has no payload. `protocol.size` still includes the complete received message, including any ignored bytes; it can therefore exceed the header size plus the delivered payload size. This reception behavior does not change the recommended emission formats. Converters copy the supplied payload without enforcing status-specific payload rules.
 
 ### Messages from the Obedient
 
@@ -140,7 +140,7 @@ In messages from the Obedient, `size` directly represents the total message size
 | `Notification` | 2 bytes of `size` + 2 bytes of `type` | variable payload |
 | `Intention` | 2 bytes of `size` + 2 bytes of `type` + 2 bytes of `correlationId` | variable payload |
 
-The specified size must include the header and payload. Each interpretation call must receive exactly one complete message: the decoded total must equal the supplied span and the header must be complete, otherwise no callback is delivered. Authority messages are limited to 32767 bytes and Obedient messages to 65535 bytes. The interpreter does not split concatenated messages or buffer partial frames. Unknown response statuses are ignored. The converters copy the header and payload into a `SteamNetworkingMessage_t`; they do not automatically construct the semantic value of the `size` field. They throw `std::bad_alloc` if GNS allocation fails and `std::length_error` if the allocation size cannot be represented.
+The specified size must include the header and payload. Each interpretation call must receive exactly one complete message: the decoded total must equal the supplied view and the header must be complete, otherwise no callback is delivered. Authority messages are limited to 32767 bytes and Obedient messages to 65535 bytes. The interpreter does not split concatenated messages or buffer partial frames. Unknown response statuses are ignored. The converters copy the header and payload into an owning `OutboundMessage`. Set the semantic value of the `size` field before conversion. Check the returned result for `ErrorCode::NotEnoughMemory` or `ErrorCode::MessageSize`.
 
 ## Identifiers
 
@@ -148,7 +148,7 @@ The specified size must include the header and payload. Each interpretation call
 - `correlationId` relates a response to its corresponding intention.
 - The ID received in the server's interpreted message callback is the internal identifier assigned by `ConnectionManager`.
 
-This internal ID belongs to the connection management implementation and is not an INER protocol field. The name `originId` does not designate a protocol field either. Network destinations use `HSteamNetConnection` handles, which are distinct from internal IDs and semantic identifiers.
+This internal ID belongs to the connection management implementation and is not an INER protocol field. The name `originId` does not designate a protocol field either. Network destinations use `lightnerx::network::ConnectionHandle` handles, which are distinct from internal IDs and semantic identifiers.
 
 ## Network destinations
 
@@ -161,7 +161,7 @@ This internal ID belongs to the connection management implementation and is not 
 | `Target::broadcast()` | all connections registered in `ConnectionManager` |
 | `Target::broadcast(exceptions)` | all connections registered in `ConnectionManager`, except the specified handles |
 
-`Target::group` stores the explicit selection of handles. Broadcast queries the `ConnectionManager` passed to `flushAll` at flush time, using the mappings maintained by the application. Its exceptions are also `HSteamNetConnection` handles.
+`Target::group` stores the explicit selection of handles. Broadcast queries the `ConnectionManager` passed to `flushAll` at flush time, using the mappings maintained by the application. Its exceptions are also `lightnerx::network::ConnectionHandle` handles.
 
 ## Receiving flow
 
@@ -170,44 +170,42 @@ Network -> Server callback -> obedientInterpret -> application callback
 Network -> Client callback -> authorityInterpret -> application callback
 ```
 
-`MessageInterpreter` delivers a `lightnerx::communication::Message` whose `header` contains the concrete type in a `std::variant` and whose `payload` is a `tcb::span<const std::byte>`.
+`MessageInterpreter` delivers a `lightnerx::communication::Message` whose `header` contains the concrete type in a `std::variant` and whose `payload` is a `std::string_view`.
 
-Callbacks run during the interpretation call. The header is delivered by value, but the span only references the received bytes. In the flow with `Server` or `Client`, these bytes are released after the receive callbacks. To retain the payload, copy its bytes during the callback; copying only `Message` keeps a reference to the same buffer.
+Callbacks run during the interpretation call. The header is delivered by value, but the view references the received bytes. In the flow with `Server` or `Client`, these bytes are released after the receive callbacks. To retain the payload, copy its bytes during the callback; copying only `Message` keeps a reference to the same buffer.
 
 ## Sending flow
 
 The usual flow is:
 
-1. Initialize the network and call `initMessagesBatcher(capacity)` before queuing the first message.
+1. Initialize the network and check the result of `initMessagesBatcher(capacity)` before queuing the first message.
 2. Compute the total size of the header and payload. For an Event or Response, encode the first field as `(totalSize << 1) | typeBit`, with bit 0 for an Event and bit 1 for a Response. For an Intention or Notification, use the total size directly.
 3. Create a `lightnerx::network::Target`.
-4. Use the corresponding converter to obtain a `lightnerx::network::OutboundMessage`.
+4. Use the corresponding converter to obtain a `lightnerx::Result<lightnerx::network::OutboundMessage>`.
 5. Pass the object to `queueMessage(std::move(outbound))`, transferring ownership of the message and destination.
 6. Check the queuing result and call `flushAll(connectionManager)` at the time chosen by the application. Releasing the message becomes the batcher's responsibility, including when queuing returns an error.
 
-Example of an `Event` from the Authority with one byte of payload defined by the application. The function assumes that the network and batcher have been initialized and supports broadcast with or without exceptions:
+Example of an `Event` from the Authority with one byte of payload defined by the application. The function assumes that the network and batcher have been initialized and returns a result for the broadcast.
 
 ```cpp
-#include "steam/steamnetworkingtypes.h"
 
-#include <array>
+#include <string_view>
 #include <cstddef>
 #include <cstdint>
 #include <utility>
 #include <vector>
-#include <system_error>
-#include <zeus/expected.hpp>
+#include <lightnerx/Result.hpp>
 #include <lightnerx/communication/event.hpp>
 #include <lightnerx/communication/message.hpp>
 #include <lightnerx/network/connection_manager.hpp>
 #include <lightnerx/network/message_batch.hpp>
 #include <lightnerx/network/target.hpp>
 
-zeus::expected<void, std::error_code> broadcastEvent(
+lightnerx::Result<void> broadcastEvent(
     const lightnerx::network::ConnectionManager& connections,
-    std::vector<HSteamNetConnection> exceptions = {}
+    std::vector<lightnerx::network::ConnectionHandle> exceptions = {}
 ) {
-    const std::array payload{std::byte{0x01}};
+    const std::string_view payload{"\x01", 1};
     const auto totalSize = sizeof(lightnerx::communication::Event) + payload.size();
     const lightnerx::communication::Event event{
         static_cast<std::uint16_t>(totalSize << 1),
@@ -229,11 +227,11 @@ zeus::expected<void, std::error_code> broadcastEvent(
 }
 ```
 
-Call `broadcastEvent(connections)` for everyone or `broadcastEvent(connections, {connectionToSkip})` to exclude a handle, checking the returned `zeus::expected`.
+Call `broadcastEvent(connections)` for everyone or `broadcastEvent(connections, {connectionToSkip})` to exclude a handle, checking the returned `lightnerx::Result`.
 
 ### What each step does
 
-`queueMessage` receives the `OutboundMessage` from the converter and stores the same message with its destination, without allocating another message or copying the bytes. The call consumes the message: on success, the batcher keeps it until the flush; if the queue is full, it releases it immediately. The caller must not call `Release()` or reuse the message after passing it to the queue. A null pointer is rejected with `invalid_argument`.
+`queueMessage` transfers ownership into the batcher without copying the bytes again. It propagates a converter error before queuing. A full queue releases the message immediately. A moved-from message is rejected with `ErrorCode::InvalidArgument`.
 
 `flushAll` iterates over pending messages, routes each one according to its destination, and releases the message received from the converter with `Release()`. All entries are processed and the queue is emptied even when send errors occur. The return value indicates success or the last error encountered among these operations.
 
@@ -241,4 +239,4 @@ Batching lets you accumulate multiple messages before a flush. Each entry remain
 
 For `Event` and `Response`, the `size` field must use the combined value described above. For `Intention` and `Notification`, it uses the total size directly.
 
-Pending batches can be discarded explicitly with `clearMessagesBatcher()` and are also released at actual network shutdown. A thrown send exception releases the complete queue before propagating to the caller.
+Pending batches can be discarded explicitly with `clearMessagesBatcher()` and are also released at actual network shutdown.

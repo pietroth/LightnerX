@@ -9,15 +9,15 @@ namespace lightnerx::network {
 Target::Target(decltype(connection) conn, decltype(broadcastExceptions) exceptions)
             : connection(std::move(conn)), broadcastExceptions(std::move(exceptions)) {}
 
-Target Target::single(HSteamNetConnection conn) {
+Target Target::single(ConnectionHandle conn) {
     return Target(conn);
 }
 
-Target Target::group(std::vector<HSteamNetConnection> connections) {
+Target Target::group(std::vector<ConnectionHandle> connections) {
     return Target(std::move(connections));
 }
 
-Target Target::broadcast(std::vector<HSteamNetConnection> exceptions) {
+Target Target::broadcast(std::vector<ConnectionHandle> exceptions) {
     return Target(std::monostate{}, std::move(exceptions));
 }
 
@@ -26,11 +26,11 @@ Target Target::broadcast(std::vector<HSteamNetConnection> exceptions) {
 }
 
 [[nodiscard]] bool Target::isGroup() const noexcept {
-    return std::holds_alternative<std::vector<HSteamNetConnection>>(connection);
+    return std::holds_alternative<std::vector<ConnectionHandle>>(connection);
 }
 
 [[nodiscard]] bool Target::isSingle() const noexcept {
-    return std::holds_alternative<HSteamNetConnection>(connection);
+    return std::holds_alternative<ConnectionHandle>(connection);
 }
 
 }
