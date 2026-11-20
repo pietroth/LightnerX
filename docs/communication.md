@@ -140,7 +140,7 @@ In messages from the Obedient, `size` directly represents the total message size
 | `Notification` | 2 bytes of `size` + 2 bytes of `type` | variable payload |
 | `Intention` | 2 bytes of `size` + 2 bytes of `type` + 2 bytes of `correlationId` | variable payload |
 
-The specified size must include the header and payload. Each interpretation call must receive exactly one complete message: the decoded total must equal the supplied view and the header must be complete, otherwise no callback is delivered. Authority messages are limited to 32767 bytes and Obedient messages to 65535 bytes. The interpreter does not split concatenated messages or buffer partial frames. Unknown response statuses are ignored. The converters copy the header and payload into an owning `OutboundMessage`. Set the semantic value of the `size` field before conversion. Check the returned result for `ErrorCode::NotEnoughMemory` or `ErrorCode::MessageSize`.
+The declared size includes the header and payload. Each interpretation call takes one complete message. The interpreter delivers a callback only when the declared size matches the supplied view, the entire header is present, and any response status is recognized. Pass concatenated messages in separate calls and assemble partial frames before calling the interpreter.
 
 ## Identifiers
 
@@ -179,7 +179,7 @@ Callbacks run during the interpretation call. The header is delivered by value, 
 The usual flow is:
 
 1. Initialize the network and check the result of `initMessagesBatcher(capacity)` before queuing the first message.
-2. Compute the total size of the header and payload. For an Event or Response, encode the first field as `(totalSize << 1) | typeBit`, with bit 0 for an Event and bit 1 for a Response. For an Intention or Notification, use the total size directly.
+2. Compute the total size of the header and payload and check it before narrowing the value to `std::uint16_t`. Authority messages can contain up to 32767 bytes. Encode the first field as `(totalSize << 1) | typeBit`, with a bit value of 0 for an Event and 1 for a Response, including `UnsuccessfulResponse`. Obedient messages can contain up to 65535 bytes. Use the total size directly for Intention and Notification.
 3. Create a `lightnerx::network::Target`.
 4. Use the corresponding converter to obtain a `lightnerx::Result<lightnerx::network::OutboundMessage>`.
 5. Pass the object to `queueMessage(std::move(outbound))`, transferring ownership of the message and destination.
@@ -229,6 +229,44 @@ lightnerx::Result<void> broadcastEvent(
 
 Call `broadcastEvent(connections)` for everyone or `broadcastEvent(connections, {connectionToSkip})` to exclude a handle, checking the returned `lightnerx::Result`.
 
+### Forwarding a received event
+
+When forwarding an interpreted message, construct the outgoing header from the bytes you will send. In an Authority callback, `protocol.size` contains the decoded byte count. Copying that field into an outbound Authority header would leave the size and type bit unencoded. The converters copy the supplied header as-is. A successful conversion confirms that the buffer was created. The caller is responsible for producing a valid INER frame.
+
+This helper queues a received `Event` for one connection. Call it while the incoming payload view is valid, with the network and batcher initialized. The converter copies the payload before the call returns.
+
+```cpp
+#include <cstdint>
+#include <variant>
+#include <lightnerx/Result.hpp>
+#include <lightnerx/communication/message.hpp>
+#include <lightnerx/network/connection_handle.hpp>
+#include <lightnerx/network/message_batch.hpp>
+#include <lightnerx/network/target.hpp>
+
+lightnerx::Result<void> queueForwardedEvent(
+    const lightnerx::communication::Message& received,
+    lightnerx::network::ConnectionHandle destination
+) {
+    using lightnerx::communication::Event;
+    const auto* event = std::get_if<Event>(&received.header);
+    if (!event) {
+        return lightnerx::Result<void>::failure(lightnerx::ErrorCode::InvalidArgument);
+    }
+    if (received.payload.size() > 32767 - sizeof(Event)) {
+        return lightnerx::Result<void>::failure(lightnerx::ErrorCode::MessageSize);
+    }
+
+    const auto totalSize = sizeof(Event) + received.payload.size();
+    const Event outgoing{static_cast<std::uint16_t>(totalSize << 1), event->mbt.type};
+    return lightnerx::network::queueMessage(lightnerx::communication::event2OutboundMessage(
+        outgoing, received.payload, lightnerx::network::Target::single(destination)
+    ));
+}
+```
+
+Check the result of `queueForwardedEvent()`, then flush at the appropriate point in the application's send loop. When forwarding responses, set the type bit to 1 and compute the size from the outgoing header and payload. Some received responses contain bytes that the interpreter omits from the delivered payload.
+
 ### What each step does
 
 `queueMessage` transfers ownership into the batcher without copying the bytes again. It propagates a converter error before queuing. A full queue releases the message immediately. A moved-from message is rejected with `ErrorCode::InvalidArgument`.
@@ -236,7 +274,5 @@ Call `broadcastEvent(connections)` for everyone or `broadcastEvent(connections, 
 `flushAll` sends the queued messages and releases their buffers. When sends return errors, flushing still attempts all entries, empties the queue, and returns the error from the last failed entry. See the [batcher reference](api.md#batcher) for error and exception behavior.
 
 Batching lets you accumulate multiple messages before a flush. Each entry remains a separate message; payloads are not concatenated. The application decides when to flush, for example at the end of an update. Success indicates that the transport accepted the send operations, without confirming processing by the recipient.
-
-For `Event` and `Response`, the `size` field must use the combined value described above. For `Intention` and `Notification`, it uses the total size directly.
 
 Pending batches can be discarded explicitly with `clearMessagesBatcher()` and are also released at actual network shutdown.

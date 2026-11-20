@@ -244,7 +244,7 @@ lightnerx::Result<lightnerx::network::OutboundMessage> notification2OutboundMess
 
 The converters copy the header and payload into an owning `OutboundMessage` and store `target` as the destination. They return `ErrorCode::NotEnoughMemory` for a failed transport allocation, `ErrorCode::MessageSize` if the combined byte count exceeds `INT_MAX` (the allocator's size limit), or `ErrorCode::IoError` if the transport utilities are unavailable.
 
-Initialize the network before using them. Fill in the `size` field according to the [binary representation](communication.md#binary-representation), then pass the result to `queueMessage`. For approved, denied, or failure responses, provide `{}` as the payload. For partial approval, provide the bytes defined by the application.
+Initialize the network before using them, then pass the result to `queueMessage`. The caller supplies the encoded size and checks the INER frame limit. The converters copy the header as supplied. In particular, an interpreted Authority header must be rebuilt with the encoded size before sending it again. Follow the recommended payload formats and the example for [forwarding a received event](communication.md#forwarding-a-received-event). See the [INER binary representation](communication.md#binary-representation).
 
 ## `<lightnerx/network/network_manager.hpp>`
 

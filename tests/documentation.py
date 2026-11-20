@@ -81,7 +81,7 @@ for start, stop, whole in [(0, 7, 13), (7, 13, 14)]:
     complete('README.md', whole)
 for index in [0, 1, 3]:
     complete('first-steps.md', index)
-for index in [2, 3]:
+for index in [2, 3, 4]:
     complete('communication.md', index)
 complete('setup.md', 0)
 for index in [0, 1]:
