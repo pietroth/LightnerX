@@ -249,15 +249,22 @@ const communication::Notification notification{
 
 ### Update and send to the server
 
-Process up to 32 messages per update and send when `isConnected()` indicates an established connection. `Target::single` selects the server's handle.
+Process up to 32 messages per update. Check the handle after every update because processing a peer closure can return success. Allow ten seconds for the connection attempt, then send notifications while connected.
 
 ```cpp
+const auto connectDeadline = std::chrono::steady_clock::now() + 10s;
+bool connectedOnce = false;
 while (true) {
     if (const auto result = client.update(32); !result) {
         std::println("Failed to update: {}", result.error().message());
         break;
     }
+    if (client.getServerHConn() == network::k_invalidConnection) {
+        std::println("{}", connectedOnce ? "Connection closed" : "Connection attempt failed");
+        return connectedOnce ? 0 : 1;
+    }
     if (client.isConnected()) {
+        connectedOnce = true;
         if (const auto result = network::queueMessage(communication::notification2OutboundMessage(
                 notification, payload, network::Target::single(client.getServerHConn()))); !result) {
             std::println("Failed to queue: {}", result.error().message());
@@ -267,6 +274,9 @@ while (true) {
             std::println("Failed to send: {}", result.error().message());
             break;
         }
+    } else if (!connectedOnce && std::chrono::steady_clock::now() >= connectDeadline) {
+        std::println("Connection attempt timed out");
+        break;
     }
     std::this_thread::sleep_for(3000ms);
 }
@@ -274,7 +284,7 @@ while (true) {
 
 ### Shut down the client
 
-When exiting due to an error, the `Client` destructor closes the connection and shuts down the network. Returning `1` indicates the failure that interrupted the example.
+The client returns `0` when an established connection closes and `1` on failure. Its destructor releases the networking resources.
 
 ```cpp
 return 1; // The Client destructor closes the connection and shuts down the network.
@@ -426,12 +436,19 @@ int main() {
         47 // The server must register this ID in NotificationRegistry.
     };
 
+    const auto connectDeadline = std::chrono::steady_clock::now() + 10s;
+    bool connectedOnce = false;
     while (true) {
         if (const auto result = client.update(32); !result) {
             std::println("Failed to update: {}", result.error().message());
             break;
         }
+        if (client.getServerHConn() == network::k_invalidConnection) {
+            std::println("{}", connectedOnce ? "Connection closed" : "Connection attempt failed");
+            return connectedOnce ? 0 : 1;
+        }
         if (client.isConnected()) {
+            connectedOnce = true;
             if (const auto result = network::queueMessage(communication::notification2OutboundMessage(
                     notification, payload, network::Target::single(client.getServerHConn()))); !result) {
                 std::println("Failed to queue: {}", result.error().message());
@@ -441,6 +458,9 @@ int main() {
                 std::println("Failed to send: {}", result.error().message());
                 break;
             }
+        } else if (!connectedOnce && std::chrono::steady_clock::now() >= connectDeadline) {
+            std::println("Connection attempt timed out");
+            break;
         }
         std::this_thread::sleep_for(3000ms);
     }
