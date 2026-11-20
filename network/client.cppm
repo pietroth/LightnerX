@@ -1,5 +1,15 @@
 module;
 
+#ifdef _WIN32
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <winsock2.h>
+#include <ws2tcpip.h>
+#else
+#include <arpa/inet.h>
+#endif
+
 #include "steam/isteamnetworkingsockets.h"
 #include "steam/steamnetworkingtypes.h"
 #include <steam/steamnetworkingsockets.h>
@@ -94,21 +104,25 @@ export namespace lightnerx::network {
                 return std::unexpected(std::make_error_code(std::errc::already_connected));
             }
 
-            if (ip.empty() || port < 1 || port > 65535) {
+            if (ip.empty() || ip.contains('\0') || port < 1 || port > 65535) {
                 return std::unexpected(std::make_error_code(std::errc::invalid_argument));
             }
 
             SteamNetworkingIPAddr address{};
-
-            const std::string ip_string{ip};
-
-            if (!address.ParseString(ip_string.c_str())) {
+            const bool bracketed = ip.starts_with('[') && ip.ends_with(']');
+            const std::string literal{bracketed ? ip.substr(1, ip.size() - 2) : ip};
+            const auto destinationPort = static_cast<uint16>(port);
+            in_addr ipv4{};
+            in6_addr ipv6{};
+            if (!bracketed && inet_pton(AF_INET, literal.c_str(), &ipv4) == 1) {
+                address.SetIPv4(ntohl(ipv4.s_addr), destinationPort);
+            } else if (inet_pton(AF_INET6, literal.c_str(), &ipv6) == 1) {
+                address.SetIPv6(ipv6.s6_addr, destinationPort);
+            } else {
                 return std::unexpected(
                     std::make_error_code(std::errc::invalid_argument)
                 );
             }
-
-            address.m_port = static_cast<uint16>(port);
 
             SteamNetworkingConfigValue_t option{};
 
