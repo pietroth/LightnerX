@@ -17,10 +17,12 @@ import lightnerx.communication.event;
 
 namespace lightnerx::communication::detail {
     SteamNetworkingMessage_t* allocateMessage(std::size_t headerSize, std::size_t payloadSize) {
-        if (payloadSize > static_cast<std::size_t>(std::numeric_limits<int>::max()) - headerSize) {
+        constexpr auto maxSize = static_cast<std::size_t>(std::numeric_limits<int>::max());
+        if (headerSize > maxSize || payloadSize > maxSize - headerSize) {
             throw std::length_error("Message exceeds the transport allocation limit");
         }
-        auto* message = SteamNetworkingUtils()->AllocateMessage(static_cast<int>(headerSize + payloadSize));
+        auto* utils = SteamNetworkingUtils();
+        auto* message = utils ? utils->AllocateMessage(static_cast<int>(headerSize + payloadSize)) : nullptr;
         if (!message) {
             throw std::bad_alloc{};
         }
