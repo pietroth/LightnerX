@@ -11,10 +11,13 @@ from module_source import ROOT, implementation
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--compiler', default='c++')
-parser.add_argument('--library', type=Path, required=True)
+parser.add_argument('--library', type=Path)
+parser.add_argument('--output', type=Path, help='Write the test source for CMake')
 parser.add_argument('--sanitize', action='store_true')
 parser.add_argument('--baseline', action='store_true')
 args = parser.parse_args()
+if not args.output and not args.library:
+    parser.error('provide --output or --library')
 
 source = r'''
 #include <bits/stdc++.h>
@@ -276,6 +279,10 @@ int main() {
     }
 }
 '''
+
+if args.output:
+    args.output.write_text(source)
+    raise SystemExit(0)
 
 with tempfile.TemporaryDirectory(prefix='lightnerx-lifecycle-') as directory:
     cpp = Path(directory) / 'lifecycle.cpp'

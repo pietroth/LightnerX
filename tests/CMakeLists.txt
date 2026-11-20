@@ -48,12 +48,42 @@ add_test(NAME lightnerx.transport_faults
 )
 set_tests_properties(lightnerx.transport_faults PROPERTIES TIMEOUT 180)
 
-add_test(NAME lightnerx.lifecycle_faults
-    COMMAND ${Python3_EXECUTABLE} "${CMAKE_CURRENT_SOURCE_DIR}/lifecycle_faults.py"
-        --compiler "${CMAKE_CXX_COMPILER}" --library "$<TARGET_FILE:GameNetworkingSockets>"
-        ${message_fault_options}
-)
-set_tests_properties(lightnerx.lifecycle_faults PROPERTIES TIMEOUT 180)
+set(lifecycle_fault_source "${CMAKE_CURRENT_BINARY_DIR}/lifecycle_faults.cpp")
+add_custom_command(OUTPUT "${lifecycle_fault_source}"
+    COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/lifecycle_faults.py"
+        --output "${lifecycle_fault_source}"
+    DEPENDS lifecycle_faults.py module_source.py
+        "${PROJECT_SOURCE_DIR}/network/client.cppm"
+        "${PROJECT_SOURCE_DIR}/network/server.cppm"
+        "${PROJECT_SOURCE_DIR}/network/network_manager.cppm"
+    VERBATIM)
+add_executable(lightnerx_test_lifecycle_faults "${lifecycle_fault_source}")
+# The generated fault test uses ordinary headers and calls the selected GNS library directly.
+set_target_properties(lightnerx_test_lifecycle_faults PROPERTIES CXX_MODULE_STD OFF CXX_SCAN_FOR_MODULES OFF)
+target_link_libraries(lightnerx_test_lifecycle_faults PRIVATE ${lightnerx_gns_target})
+if(WIN32)
+    target_link_libraries(lightnerx_test_lifecycle_faults PRIVATE ws2_32)
+endif()
+if(message_fault_options)
+    target_compile_options(lightnerx_test_lifecycle_faults PRIVATE -fsanitize=address,undefined
+        -fno-sanitize=vptr -fno-omit-frame-pointer -fno-sanitize-recover=all)
+    target_link_options(lightnerx_test_lifecycle_faults PRIVATE -fsanitize=address,undefined)
+endif()
+add_test(NAME lightnerx.lifecycle_faults COMMAND lightnerx_test_lifecycle_faults)
+set_tests_properties(lightnerx.lifecycle_faults PROPERTIES TIMEOUT 60)
+
+if(LIGHTNERX_BUILD_SHARED AND UNIX)
+    foreach(plugin IN ITEMS first second)
+        add_library(lightnerx_test_plugin_${plugin} MODULE runtime_plugin.cpp)
+        target_link_libraries(lightnerx_test_plugin_${plugin} PRIVATE LightnerX)
+    endforeach()
+    add_executable(lightnerx_test_shared_runtime shared_runtime.cpp)
+    # Link so the process has the sanitizer runtime before loading instrumented modules.
+    target_link_libraries(lightnerx_test_shared_runtime PRIVATE LightnerX ${CMAKE_DL_LIBS})
+    add_test(NAME lightnerx.shared_runtime COMMAND lightnerx_test_shared_runtime
+        "$<TARGET_FILE:lightnerx_test_plugin_first>" "$<TARGET_FILE:lightnerx_test_plugin_second>")
+    set_tests_properties(lightnerx.shared_runtime PROPERTIES TIMEOUT 60)
+endif()
 
 add_test(NAME lightnerx.integration
     COMMAND ${Python3_EXECUTABLE} "${CMAKE_CURRENT_SOURCE_DIR}/integration.py"
@@ -88,7 +118,12 @@ add_test(NAME lightnerx.consumer
             "-DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER}"
             "-DCMAKE_MAKE_PROGRAM=${CMAKE_MAKE_PROGRAM}"
             "-DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}"
+            "-DCMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}"
+            "-DCMAKE_C_FLAGS=${CMAKE_C_FLAGS}"
             "-DCMAKE_CXX_FLAGS=${CMAKE_CXX_FLAGS}"
+            "-DBUILD_SHARED_LIB=${BUILD_SHARED_LIB}"
+            "-DBUILD_STATIC_LIB=${BUILD_STATIC_LIB}"
+            "-DLIGHTNERX_BUILD_SHARED=${LIGHTNERX_BUILD_SHARED}"
             "-DCMAKE_EXE_LINKER_FLAGS=${CMAKE_EXE_LINKER_FLAGS}"
             "-DCMAKE_SHARED_LINKER_FLAGS=${CMAKE_SHARED_LINKER_FLAGS}"
             "-DLIGHTNERX_SANITIZERS=${LIGHTNERX_SANITIZERS}"

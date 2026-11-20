@@ -16,7 +16,24 @@ set(BUILD_EXAMPLES OFF CACHE BOOL "Build GameNetworkingSockets examples")
 
 add_subdirectory(external/GameNetworkingSockets)
 
-add_library(LightnerX STATIC)
+if(TARGET GameNetworkingSockets)
+    set(lightnerx_gns_target GameNetworkingSockets)
+elseif(TARGET GameNetworkingSockets_s)
+    set(lightnerx_gns_target GameNetworkingSockets_s)
+else()
+    message(FATAL_ERROR "LightnerX requires a GameNetworkingSockets library. Enable BUILD_SHARED_LIB or BUILD_STATIC_LIB.")
+endif()
+
+option(LIGHTNERX_BUILD_SHARED "Build one LightnerX shared library for use by multiple modules" OFF)
+if(LIGHTNERX_BUILD_SHARED)
+    add_library(LightnerX SHARED)
+    set_target_properties(LightnerX PROPERTIES WINDOWS_EXPORT_ALL_SYMBOLS ON)
+    if(lightnerx_gns_target STREQUAL "GameNetworkingSockets_s")
+        set_property(TARGET GameNetworkingSockets_s PROPERTY POSITION_INDEPENDENT_CODE ON)
+    endif()
+else()
+    add_library(LightnerX STATIC)
+endif()
 target_compile_features(LightnerX PUBLIC cxx_std_26)
 set_target_properties(LightnerX PROPERTIES CXX_MODULE_STD ON)
 
@@ -41,7 +58,7 @@ target_include_directories(LightnerX
 
 target_link_libraries(LightnerX
     PUBLIC
-        GameNetworkingSockets
+        ${lightnerx_gns_target}
 )
 if(WIN32)
     target_link_libraries(LightnerX PRIVATE ws2_32)
