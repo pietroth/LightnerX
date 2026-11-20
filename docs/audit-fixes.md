@@ -1,6 +1,6 @@
 # Correções da auditoria LightnerX — registro histórico
 
-Este documento preserva os resultados da auditoria de 12/11/2026, anterior à migração. O LightnerX atual usa C++17 e headers clássicos; a validação atual está em [Migração C++17](migration-cpp17.md) e as instruções de build em [Setup](setup.md). Os caminhos da tabela abaixo foram atualizados para os arquivos atuais; os headers correspondentes estão em `include/lightnerx/`. Números, logs e limitações descritos como históricos referem-se exclusivamente à auditoria.
+Este documento preserva os resultados da auditoria de 12/11/2026, anterior à migração. Os contratos e códigos de erro registrados na auditoria correspondem à versão C++26. Os caminhos da tabela remetem aos arquivos da versão C++17, cujos headers estão em `include/lightnerx/`. Para integrar a versão atual, consulte a [Referência da API](api.md), a [Migração C++17](migration-cpp17.md) e o [Setup](setup.md).
 
 Revisão de origem: `8e5a352`. Dependência GNS: `d534c19`. Auditoria lida:
 `LightnerX-audit.md`. Trabalho validado em 12/11/2026 com GCC/libstdc++ 15.2,
@@ -113,7 +113,7 @@ teste suplementar de ciclo de vida, que chama a biblioteca real, usa
 exclusão. Esse diagnóstico foi investigado mesmo quando CTest inicialmente
 reportou sucesso por causa do modo recuperável padrão do UBSan.
 
-## API pública e contratos preservados
+## Contratos registrados na auditoria C++26
 
 - Client e Server não podem mais ser copiados ou movidos. Server ganha destrutor
   com limpeza automática; `close()` é idempotente e `noexcept`.
@@ -135,8 +135,8 @@ reportou sucesso por causa do modo recuperável padrão do UBSan.
 - Adicionados `clearMessagesBatcher()` e `Target::isGroup()`. A API
   `queueMessage()`/Target permanece; mensagens pendentes são liberadas no
   encerramento e após exceções. `initMessagesBatcher()` não descarta a fila.
-- Há uma única constante pública `k_invalidConnection`. CMake agora propaga C++17 e
-  os requisitos públicos GNS. O consumidor inclui os headers clássicos descritos em [Setup](setup.md).
+- A auditoria unificou a constante pública `k_invalidConnection`. Naquela versão,
+  o target CMake propagava C++26 e os requisitos de GameNetworkingSockets.
 
 Não há decisão arquitetural pendente para as correções adotadas. As restrições
 de múltiplas instâncias, transporte próprio, callbacks e framing foram
