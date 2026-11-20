@@ -43,6 +43,9 @@ target_link_libraries(LightnerX
     PUBLIC
         GameNetworkingSockets
 )
+if(WIN32)
+    target_link_libraries(LightnerX PRIVATE ws2_32)
+endif()
 
 option(LIGHTNERX_BUILD_TESTS "Build LightnerX regression tests" OFF)
 if(LIGHTNERX_BUILD_TESTS)

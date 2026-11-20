@@ -343,6 +343,8 @@ HSteamNetConnection getServerHConn() const noexcept;
 
 `start()` initializes the transport. `connect()` initiates the connection to the specified IP address and port; monitor `isConnected()` while calling `update()` to observe the connection being established. `update()` runs network callbacks and processes up to the specified number of messages; values less than or equal to zero run only the network callbacks.
 
+Pass a complete IPv4 or IPv6 literal and a separate port from 1 to 65535. IPv6 brackets are optional. An embedded NUL, trailing text, a hostname or an inline port returns `std::errc::invalid_argument`.
+
 `getServerHConn()` returns the handle used to send messages to the server, for example with `Target::single(client.getServerHConn())`. The receive callback is stored by the client, and the provided span remains valid during its execution.
 
 `disconnect()` requests that the connection be closed and forwards `enableLinger` to the transport. On success it immediately invalidates the handle and clears `isConnected()`, allowing another `connect()` on the same instance. It retains ownership of the runtime until the destructor. Disconnecting inside a receive callback stops further callbacks and messages from that receive batch; all acquired messages are released. The destructor closes the existing connection and shuts down networking.
