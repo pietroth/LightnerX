@@ -6,11 +6,11 @@ The migration starts from `541ae1d39225ec9b747b9f888f96242a710e9073`, with GameN
 
 The `communication` layer contains packed INER headers, notification registration, serialization and parsing. The `network` layer owns GNS initialization, client/server lifecycle, connection IDs, routing and a shared outbound queue. Applications connect the layers through synchronous callbacks and supply their own update loop.
 
-The initial migration captured original behavior, introduced in-tree backports, replaced modules with headers and sources, then switched the library and consumers to C++17. Subsequent commits replaced the in-tree backports with tcbrindle/span and zeus-cpp/expected.
+The initial migration captured original behavior, introduced in-tree backports, replaced modules with headers and sources, then switched the library and consumers to C++17.
 
 All 14 module units now have declarations in `include/lightnerx/{communication,network}/*.hpp` and definitions in the corresponding `.cpp` files. Templates remain in headers. Network ownership and the outbound queue each retain one state shared across translation units. Public constants use inline variables so their addresses also remain shared. Public headers compile independently and tolerate repeated inclusion.
 
-Consumers include the corresponding LightnerX headers, use `tcb::span` and `zeus::expected` with their associated helpers, and rebuild against the C++17 `LightnerX` target. In consumer code that names a backport type explicitly, update the include and use the upstream namespace. The [type guide](cpp17-types.md) lists the headers and shows both types in use.
+Consumers include the corresponding LightnerX headers and rebuild against the C++17 `LightnerX` target. Use `std::string_view` for binary views, `lightnerx::Result` to inspect success or failure, and `lightnerx::network::ConnectionHandle` for connection identifiers. The [type guide](cpp17-types.md) shows how to wrap a binary payload.
 
 CMake 3.22 or newer and the public `cxx_std_17` requirement replace the experimental module build. Standard includes, iterator algorithms and explicit function templates replace newer language/library facilities. [Setup](setup.md) contains current commands.
 

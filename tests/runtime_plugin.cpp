@@ -11,7 +11,7 @@ std::unique_ptr<lightnerx::network::Client> client;
 extern "C" int startClient() {
     auto candidate = std::make_unique<lightnerx::network::Client>();
     const auto result = candidate->start();
-    if (!result) return result.error() == std::errc::device_or_resource_busy ? EBUSY : EIO;
+    if (!result) return result.error() == lightnerx::ErrorCode::DeviceOrResourceBusy ? EBUSY : EIO;
     client = std::move(candidate);
     return 0;
 }

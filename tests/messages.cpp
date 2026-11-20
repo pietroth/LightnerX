@@ -10,8 +10,8 @@
 #include <iostream>
 #include <limits>
 #include <new>
-#include <tcb/span.hpp>
 #include <stdexcept>
+#include <string>
 #include <variant>
 #include <vector>
 #include <lightnerx/communication/message.hpp>
@@ -32,15 +32,12 @@ void require(bool condition, const char* description) {
     if (!condition) throw std::runtime_error(description);
 }
 
-std::vector<std::byte> bytes(OutboundMessage outbound) {
-    auto* message = outbound.message;
-    std::vector<std::byte> result(static_cast<std::byte*>(message->m_pData),
-                                  static_cast<std::byte*>(message->m_pData) + message->m_cbSize);
-    message->Release();
-    return result;
+std::string bytes(lightnerx::Result<OutboundMessage> outbound) {
+    require(outbound.has_value(), "outbound conversion failed");
+    return std::string(outbound.value().data());
 }
 
-void setSize(std::vector<std::byte>& buffer, std::uint16_t size) {
+void setSize(std::string& buffer, std::uint16_t size) {
     std::memcpy(buffer.data(), &size, sizeof(size));
 }
 
@@ -57,18 +54,19 @@ int main() {
         require(manager.add(sender).has_value(), "connection registration failed");
         NotificationRegistry registry;
         registry.registerId(47);
-        const std::array payload{std::byte{42}, std::byte{7}};
+        const std::string_view payload{"\x2a\x00\xff", 3};
         const auto target = Target::single(sender);
         require(target.isSingle() && !target.isGroup() && !target.isBroadcast(), "single target");
         require(Target::group({sender}).isGroup(), "group target");
         require(Target::broadcast().isBroadcast(), "broadcast target");
-        auto event = bytes(event2OutboundMessage(Event(12, 10), payload, target));
+        auto event = bytes(event2OutboundMessage(Event(14, 10), payload, target));
+        require(std::string_view(event).substr(sizeof(Event)) == payload, "binary payload was altered");
         auto response = bytes(response2OutboundMessage(Response(11, 20, APPROVED_RESPONSE), {}, target));
         auto failure = bytes(response2OutboundMessage(Response(11, 20, FAILURE_RESPONSE), {}, target));
         auto denied = bytes(unsuccessfulResponse2OutboundMessage(UnsuccessfulResponse(15, 20, DENIED_RESPONSE, 9), {}, target));
-        auto unsuccessful = bytes(unsuccessfulResponse2OutboundMessage(UnsuccessfulResponse(19, 20, PARTIALLY_APPROVED_RESPONSE, 9), payload, target));
-        auto notification = bytes(notification2OutboundMessage(Notification(6, 47), payload, target));
-        auto intention = bytes(intention2OutboundMessage(Intention(8, 48, 20), payload, target));
+        auto unsuccessful = bytes(unsuccessfulResponse2OutboundMessage(UnsuccessfulResponse(21, 20, PARTIALLY_APPROVED_RESPONSE, 9), payload, target));
+        auto notification = bytes(notification2OutboundMessage(Notification(7, 47), payload, target));
+        auto intention = bytes(intention2OutboundMessage(Intention(9, 48, 20), payload, target));
         MessageInterpreter interpreter;
         int authorityCount = 0, obedientCount = 0;
         interpreter.addAuthorityInterpretedMessageCallback([&](Message message) {
@@ -89,14 +87,14 @@ int main() {
             interpreter.authorityInterpret(valid);
             require(authorityCount == before + 1, "valid authority message rejected");
             for (std::size_t size = 0; size < valid.size(); ++size)
-                interpreter.authorityInterpret(tcb::span{valid}.first(size));
+                interpreter.authorityInterpret(std::string_view(valid).substr(0, size));
             auto bad = valid;
-            setSize(bad, std::to_integer<unsigned>(valid[0]) & 1u);
+            setSize(bad, static_cast<unsigned char>(valid[0]) & 1u);
             interpreter.authorityInterpret(bad);
-            setSize(bad, static_cast<std::uint16_t>(65534 | (std::to_integer<unsigned>(valid[0]) & 1u)));
+            setSize(bad, static_cast<std::uint16_t>(65534 | (static_cast<unsigned char>(valid[0]) & 1u)));
             interpreter.authorityInterpret(bad);
             bad = valid;
-            bad.push_back(std::byte{});
+            bad.push_back('\0');
             interpreter.authorityInterpret(bad);
             require(authorityCount == before + 1, "malformed authority message accepted");
         }
@@ -105,20 +103,20 @@ int main() {
             interpreter.obedientInterpret(valid, registry, sender, manager);
             require(obedientCount == before + 1, "valid obedient message rejected");
             for (std::size_t size = 0; size < valid.size(); ++size)
-                interpreter.obedientInterpret(tcb::span{valid}.first(size), registry, sender, manager);
+                interpreter.obedientInterpret(std::string_view(valid).substr(0, size), registry, sender, manager);
             auto bad = valid;
             setSize(bad, 0);
             interpreter.obedientInterpret(bad, registry, sender, manager);
             setSize(bad, 65535);
             interpreter.obedientInterpret(bad, registry, sender, manager);
             bad = valid;
-            bad.insert(bad.end(), valid.begin(), valid.end());
+            bad.append(valid);
             interpreter.obedientInterpret(bad, registry, sender, manager);
             interpreter.obedientInterpret(valid, registry, 0, manager);
             require(obedientCount == before + 1, "malformed or unidentified obedient message accepted");
         }
         auto unknownStatus = response;
-        unknownStatus[4] = std::byte{255};
+        unknownStatus[4] = static_cast<char>(255);
         const auto beforeUnknown = authorityCount;
         interpreter.authorityInterpret(unknownStatus);
         require(authorityCount == beforeUnknown, "unknown status accepted");
@@ -140,18 +138,18 @@ int main() {
         require(obedientCount == beforeShort, "short intention header accepted");
 
         // Exercise the largest representable complete messages and overflow-by-one buffers.
-        const std::vector<std::byte> authorityPayload(32767 - sizeof(Event));
+        const std::string authorityPayload(32767 - sizeof(Event), '\0');
         auto largestEvent = bytes(event2OutboundMessage(Event(65534, 10), authorityPayload, target));
         const auto beforeBoundaryAuthority = authorityCount;
         interpreter.authorityInterpret(largestEvent);
-        largestEvent.push_back(std::byte{});
+        largestEvent.push_back('\0');
         interpreter.authorityInterpret(largestEvent);
         require(authorityCount == beforeBoundaryAuthority + 1, "authority length boundary");
-        const std::vector<std::byte> obedientPayload(65535 - sizeof(Notification));
+        const std::string obedientPayload(65535 - sizeof(Notification), '\0');
         auto largestNotification = bytes(notification2OutboundMessage(Notification(65535, 47), obedientPayload, target));
         const auto beforeBoundaryObedient = obedientCount;
         interpreter.obedientInterpret(largestNotification, registry, sender, manager);
-        largestNotification.push_back(std::byte{});
+        largestNotification.push_back('\0');
         interpreter.obedientInterpret(largestNotification, registry, sender, manager);
         require(obedientCount == beforeBoundaryObedient + 1, "obedient length boundary");
 
@@ -179,7 +177,7 @@ int main() {
         try { reentrant.authorityInterpret(event); } catch (int value) { caught = value == 42; }
         require(caught, "callback exception was swallowed");
 
-        initMessagesBatcher(2);
+        require(initMessagesBatcher(2).has_value(), "queue reservation failed");
         require(queueMessage(event2OutboundMessage(Event(8, 10), {}, Target::single(0))).has_value(), "queue failed");
         require(!flushAll(manager), "invalid send succeeded");
         require(flushAll(manager).has_value(), "failed flush retained messages");
@@ -188,14 +186,13 @@ int main() {
         clearMessagesBatcher();
         require(flushAll(manager).has_value(), "clear retained messages");
 #ifdef LIGHTNERX_SOURCE_TEST
-        caught = false;
-        try {
-            lightnerx::communication::detail::allocateMessage(sizeof(Event), std::numeric_limits<std::size_t>::max());
-        } catch (const std::length_error&) { caught = true; }
-        require(caught, "allocation size overflow was not rejected");
+        reportedPayloadSize = std::numeric_limits<std::size_t>::max();
+        const auto oversized = event2OutboundMessage(Event(8, 10), {}, target);
+        require(!oversized && oversized.error() == lightnerx::ErrorCode::MessageSize,
+                "allocation size overflow was not rejected");
+        reportedPayloadSize.reset();
         failAllocation = true;
-        int badAllocCount = 0;
-        const std::array<std::function<OutboundMessage()>, 5> converters{
+        const std::array<std::function<lightnerx::Result<OutboundMessage>()>, 5> converters{
             [&] { return event2OutboundMessage(Event(8, 10), {}, target); },
             [&] { return intention2OutboundMessage(Intention(6, 10, 1), {}, target); },
             [&] { return notification2OutboundMessage(Notification(4, 10), {}, target); },
@@ -203,9 +200,10 @@ int main() {
             [&] { return unsuccessfulResponse2OutboundMessage(UnsuccessfulResponse(15, 1, DENIED_RESPONSE, 1), {}, target); }
         };
         for (const auto& convert : converters) {
-            try { convert(); } catch (const std::bad_alloc&) { ++badAllocCount; }
+            const auto result = convert();
+            require(!result && result.error() == lightnerx::ErrorCode::NotEnoughMemory,
+                    "converter did not report allocation failure");
         }
-        require(badAllocCount == 5, "not every converter reports allocation failure");
         failAllocation = false;
         for (int completed = 0; completed < 2; ++completed) {
             require(queueMessage(event2OutboundMessage(Event(8, 10), {}, target)).has_value(), "queue failed");
@@ -213,7 +211,7 @@ int main() {
             throwSend = true;
             sendsBeforeThrow = completed;
             caught = false;
-            try { flushAll(manager); } catch (int value) { caught = value == 23; }
+            try { (void)flushAll(manager); } catch (int value) { caught = value == 23; }
             require(caught, "send exception swallowed");
             require(liveMessages == 0, "exception leaked queued messages");
         }

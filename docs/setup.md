@@ -6,15 +6,13 @@ LightnerX is a C++17 library built statically by default. CMake provides the `Li
 
 Use CMake **3.22 or newer**, a C++17 compiler, and a build tool such as Ninja. The CI matrix builds with GCC 14 and Clang 19 on Linux in Debug and Release.
 
-LightnerX uses three pinned Git submodules.
+LightnerX uses a pinned Git submodule for its transport.
 
 | Dependency | Path |
 | --- | --- |
 | [GameNetworkingSockets](https://github.com/ValveSoftware/GameNetworkingSockets) | `external/GameNetworkingSockets` |
-| [tcbrindle/span](https://github.com/tcbrindle/span/tree/836dc6a0efd9849cb194e88e4aa2387436bb079b) | `external/span` |
-| [zeus-cpp/expected v1.4.0](https://github.com/zeus-cpp/expected/tree/v1.4.0) | `external/expected` |
 
-Initialize or update them from the repository root.
+Initialize or update the submodule from the repository root.
 
 ```bash
 git submodule update --init --recursive
@@ -50,7 +48,7 @@ LightnerX uses the shared GNS target when available. Configure with `-DBUILD_SHA
 
 ## Consuming with CMake
 
-The target propagates C++17, LightnerX and dependency headers, compile definitions and link requirements. Consumers link `LightnerX`:
+The target propagates C++17, LightnerX headers and the required link options. Consumers link `LightnerX`:
 
 ```cmake
 cmake_minimum_required(VERSION 3.22)
@@ -73,7 +71,7 @@ int main() {
 
 Use ordinary headers and sources with compatible compiler and standard-library ABIs. Each former module has a corresponding header, for example `<lightnerx/network/server.hpp>`, with definitions in `network/server.cpp`. The independent `tests/consumer` project checks propagated requirements and shared network/queue state across translation units. All public headers also compile in isolation.
 
-Byte views use `tcb::span` from `<tcb/span.hpp>` and results use `zeus::expected` from `<zeus/expected.hpp>`. Both dependencies are header-only and available to consumers through the `LightnerX` target. See [C++17 byte views and results](cpp17-types.md) for examples.
+Byte views use `std::string_view` from `<string_view>`. Results use `lightnerx::Result` from `<lightnerx/Result.hpp>`. Consumers can compile with `-fno-exceptions`. See [C++17 byte views and results](cpp17-types.md) for examples.
 
 For a host application that loads multiple plugins, configure with `-DLIGHTNERX_BUILD_SHARED=ON` and link each plugin to the same `LightnerX` target from the host build. Ship one shared library instance with the application. Static linking is supported for consumers that link LightnerX once into the process. Separate static copies embedded in plugins have separate state and can interfere with the same GNS runtime.
 

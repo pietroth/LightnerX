@@ -6,7 +6,6 @@
 #include <cstddef>
 #include <exception>
 #include <iostream>
-#include <tcb/span.hpp>
 #include <stdexcept>
 #include <string>
 #include <string_view>
@@ -43,13 +42,13 @@ void smoke() {
             Client client;
             check(!client.disconnect(false) && !client.update(1), "unstarted client guards");
             check(client.start().has_value(), "client start");
-            check(client.start().error() == std::errc::operation_in_progress, "client duplicate start");
+            check(client.start().error() == lightnerx::ErrorCode::OperationInProgress, "client duplicate start");
             auto* interface = SteamNetworkingSockets();
             {
                 Client other;
                 Server server;
-                check(other.start().error() == std::errc::device_or_resource_busy, "second client rejected");
-                check(server.start(45333, 1000).error() == std::errc::device_or_resource_busy, "mixed owners rejected");
+                check(other.start().error() == lightnerx::ErrorCode::DeviceOrResourceBusy, "second client rejected");
+                check(server.start(45333, 1000).error() == lightnerx::ErrorCode::DeviceOrResourceBusy, "mixed owners rejected");
                 check(!server.update(), "unstarted server guard");
             }
             networkKill();
@@ -59,8 +58,8 @@ void smoke() {
         check(!isNetworkInitialized() && !SteamNetworkingSockets(), "client destructor releases network");
     }
     Server server;
-    check(server.start(-1, 1000).error() == std::errc::invalid_argument, "invalid port");
-    check(server.start(0, 1000).error() == std::errc::invalid_argument, "GNS requires an explicit listen port");
+    check(server.start(-1, 1000).error() == lightnerx::ErrorCode::InvalidArgument, "invalid port");
+    check(server.start(0, 1000).error() == lightnerx::ErrorCode::InvalidArgument, "GNS requires an explicit listen port");
     check(!isNetworkInitialized(), "argument rejection preserves network state");
     {
         Client client;
@@ -68,11 +67,11 @@ void smoke() {
         for (const std::string_view ip : {"127.0.0.1abc", "127.0.0.1:1234", "[127.0.0.1]",
                                           "127.0.0.256", "::1xyz", "[::1]:1234"}) {
             const auto result = client.connect(ip, 45333);
-            check(!result && result.error() == std::errc::invalid_argument, "invalid IP literal accepted");
+            check(!result && result.error() == lightnerx::ErrorCode::InvalidArgument, "invalid IP literal accepted");
         }
         constexpr char withNul[] = "127.0.0.1\0suffix";
         const auto result = client.connect(std::string_view(withNul, sizeof(withNul) - 1), 45333);
-        check(!result && result.error() == std::errc::invalid_argument, "embedded NUL accepted");
+        check(!result && result.error() == lightnerx::ErrorCode::InvalidArgument, "embedded NUL accepted");
         check(client.getServerHConn() == k_invalidConnection, "invalid IP created a connection");
         check(client.connect("[::1]", 45333).has_value(), "bracketed IPv6 literal rejected");
         check(client.disconnect(false).has_value(), "IPv6 cleanup");
@@ -84,13 +83,12 @@ void runServer(int port) {
     Server server;
     ConnectionManager connections(2, 2);
     int accepted = 0, disconnected = 0, received = 0;
-    int addedConnectCalls = 0, addedReceiveCalls = 0, caught = 0;
+    int addedConnectCalls = 0, addedReceiveCalls = 0;
     server.addClientConnectedCallback([&](HSteamNetConnection handle) {
         check(connections.add(handle).has_value(), "register peer");
         ++accepted;
         if (accepted == 1) {
             server.addClientConnectedCallback([&](auto) { ++addedConnectCalls; });
-            throw std::runtime_error("expected admission exception");
         }
     });
     server.addClientDisconnectedCallback([&](HSteamNetConnection handle) {
@@ -99,35 +97,30 @@ void runServer(int port) {
         connections.remove(*id);
         if (++disconnected == 3) server.close();
     });
-    server.addClientReceivedMessageCallback([&](tcb::span<const std::byte> data, auto handle) {
-        check(server.update().error() == std::errc::operation_in_progress, "recursive server update");
-        check(data.size() == 1 && (data[0] == std::byte{0x61} || data[0] == std::byte{0x62}), "server received payload");
+    server.addClientReceivedMessageCallback([&](std::string_view data, auto handle) {
+        check(server.update().error() == lightnerx::ErrorCode::OperationInProgress, "recursive server update");
+        check(data.size() == 1 && (data[0] == 'a' || data[0] == 'b'), "server received payload");
         if (++received == 1) server.addClientReceivedMessageCallback([&](auto, auto) { ++addedReceiveCalls; });
-        if (data[0] == std::byte{0x62}) {
+        if (data[0] == 'b') {
             check(server.disconnectConnection(handle, false).has_value(), "server initiated disconnect");
         } else {
             check(sendToConnection(data, handle).has_value(), "echo send");
         }
     });
     check(server.start(port, 3000).has_value(), "IP listener start");
-    check(server.start(port, 3000).error() == std::errc::operation_in_progress, "server duplicate start");
+    check(server.start(port, 3000).error() == lightnerx::ErrorCode::OperationInProgress, "server duplicate start");
     {
         Server second;
-        check(second.start(port, 3000).error() == std::errc::device_or_resource_busy, "second server rejected");
+        check(second.start(port, 3000).error() == lightnerx::ErrorCode::DeviceOrResourceBusy, "second server rejected");
     }
     std::cout << "READY\n" << std::flush;
     const auto deadline = std::chrono::steady_clock::now() + 15s;
     while (disconnected < 3 && std::chrono::steady_clock::now() < deadline) {
-        try {
-            check(server.update().has_value(), "server update");
-        } catch (const std::runtime_error& error) {
-            if (std::string_view(error.what()) != "expected admission exception") throw;
-            ++caught;
-        }
+        check(server.update().has_value(), "server update");
         std::this_thread::sleep_for(1ms);
     }
     check(accepted == 3 && disconnected == 3 && received == 3, "three complete sessions");
-    check(caught == 1 && addedConnectCalls == 2 && addedReceiveCalls == 1, "callback contracts");
+    check(addedConnectCalls == 2 && addedReceiveCalls == 1, "callback contracts");
     check(connections.getOnlineCount() == 0 && !isNetworkInitialized(), "callback close completes teardown");
     check(server.start(port, 3000).has_value(), "server restart after deferred close");
     server.close();
@@ -139,9 +132,9 @@ void runServer(int port) {
 void runClient(int port) {
     Client client;
     int received = 0, addedCalls = 0;
-    client.addServerReceivedMessageCallback([&](tcb::span<const std::byte> data) {
-        check(client.update(1).error() == std::errc::operation_in_progress, "recursive client update");
-        check(data.size() == 1 && data[0] == std::byte{0x61}, "client received payload");
+    client.addServerReceivedMessageCallback([&](std::string_view data) {
+        check(client.update(1).error() == lightnerx::ErrorCode::OperationInProgress, "recursive client update");
+        check(data.size() == 1 && data[0] == 'a', "client received payload");
         if (++received == 1) client.addServerReceivedMessageCallback([&](auto) { ++addedCalls; });
     });
     check(client.start().has_value(), "client start");
@@ -152,7 +145,7 @@ void runClient(int port) {
         while (received < round && std::chrono::steady_clock::now() < deadline) {
             check(client.update(8).has_value(), "client update");
             if (client.isConnected() && !sent) {
-                const std::array data{std::byte{0x61}};
+                const std::string_view data = "a";
                 check(sendToConnection(data, client.getServerHConn()).has_value(), "client send");
                 sent = true;
             }
@@ -171,7 +164,7 @@ void runClient(int port) {
     while (client.getServerHConn() != k_invalidConnection && std::chrono::steady_clock::now() < deadline) {
         check(client.update(8).has_value(), "remote disconnect update");
         if (client.isConnected() && !sent) {
-            const std::array data{std::byte{0x62}};
+            const std::string_view data = "b";
             check(sendToConnection(data, client.getServerHConn()).has_value(), "request server disconnect");
             sent = true;
         }

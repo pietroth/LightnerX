@@ -1,17 +1,19 @@
 #include <lightnerx/network/connection_manager.hpp>
 
+#include <steam/steamnetworkingsockets.h>
+
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
+#include <cstdlib>
 #include <optional>
-#include <stdexcept>
 #include <utility>
 
 namespace lightnerx::network {
 
 ConnectionManager::ConnectionManager(int initialReserve, int maxCapacity) {
     if (initialReserve < 0 || maxCapacity < 0) {
-        throw std::invalid_argument("ConnectionManager capacities must be nonnegative");
+        std::abort();
     }
     this->maxCapacity = std::min(maxCapacity, static_cast<int>(maxId));
     clients.reserve(std::min(initialReserve, this->maxCapacity) + 1);
@@ -48,7 +50,7 @@ ConnectionManager& ConnectionManager::operator=(const ConnectionManager& other) 
     return *this;
 }
 
-HSteamNetConnection ConnectionManager::getHSteamNetConnection(uint16_t id) const noexcept {
+ConnectionHandle ConnectionManager::getHSteamNetConnection(std::uint16_t id) const noexcept {
     if (id >= clients.size()) {
         return invalidConnection;
     }
@@ -56,13 +58,13 @@ HSteamNetConnection ConnectionManager::getHSteamNetConnection(uint16_t id) const
     return clients[id];
 }
 
-std::optional<uint16_t> ConnectionManager::getClientId(HSteamNetConnection hConn) const noexcept {
+std::optional<std::uint16_t> ConnectionManager::getClientId(ConnectionHandle hConn) const noexcept {
     const auto entry = clientIds.find(hConn);
     if (entry == clientIds.end()) return std::nullopt;
     return entry->second;
 }
 
-std::optional<uint16_t> ConnectionManager::add(HSteamNetConnection hConn) {
+std::optional<std::uint16_t> ConnectionManager::add(ConnectionHandle hConn) {
     if (!isNetworkInitialized()) {
         return {};
     }
@@ -78,11 +80,11 @@ std::optional<uint16_t> ConnectionManager::add(HSteamNetConnection hConn) {
     }
 
     if (freeIds.empty() && nextId > maxId) return std::nullopt;
-    const uint16_t id = freeIds.empty() ? static_cast<uint16_t>(nextId) : *freeIds.begin();
+    const std::uint16_t id = freeIds.empty() ? static_cast<std::uint16_t>(nextId) : *freeIds.begin();
 
     // Complete all allocating operations before committing the new ID.
     if (id >= clients.size()) {
-        clients.resize(std::min(static_cast<size_t>(id) + 16, static_cast<size_t>(maxId) + 1));
+        clients.resize(std::min(static_cast<std::size_t>(id) + 16, static_cast<std::size_t>(maxId) + 1));
     }
     clientIds.emplace(hConn, id);
     if (freeIds.empty()) ++nextId;
@@ -99,14 +101,14 @@ void ConnectionManager::remove(int id) {
         return;
     }
 
-    HSteamNetConnection hConn = clients[id];
+    ConnectionHandle hConn = clients[id];
 
     if (hConn == invalidConnection) {
         return;
     }
 
     // Insertion may allocate. Leave the registration intact on failure.
-    freeIds.insert(static_cast<uint16_t>(id));
+    freeIds.insert(static_cast<std::uint16_t>(id));
     clientIds.erase(hConn);
     clients[id] = invalidConnection;
     onlineCount--;

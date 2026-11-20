@@ -10,12 +10,11 @@
 
 #include <lightnerx/network/client.hpp>
 
+#include <steam/steamnetworkingsockets.h>
+
 #include <cstddef>
-#include <zeus/expected.hpp>
-#include <tcb/span.hpp>
 #include <string>
 #include <string_view>
-#include <system_error>
 #include <utility>
 #include <vector>
 
@@ -49,11 +48,9 @@ void Client::addServerReceivedMessageCallback(const ServerReceivedMessageCallbac
     serverReceivedMessageCallbacks.push_back(callback);
 }
 
-zeus::expected<void, std::error_code> Client::start() {
+Result<void> Client::start() {
     if (m_sockets) {
-        return zeus::unexpected(
-            std::make_error_code(std::errc::operation_in_progress)
-        );
+        return Result<void>::failure(ErrorCode::OperationInProgress);
     }
 
     const bool networkWasInitialized = isNetworkInitialized();
@@ -64,9 +61,7 @@ zeus::expected<void, std::error_code> Client::start() {
     if (!m_sockets) {
         detail::releaseNetworkOwner(this, !networkWasInitialized);
 
-        return zeus::unexpected(
-            std::make_error_code(std::errc::io_error)
-        );
+        return Result<void>::failure(ErrorCode::IoError);
     }
 
     s_callbackInstance = this;
@@ -74,17 +69,17 @@ zeus::expected<void, std::error_code> Client::start() {
     return {};
 }
 
-zeus::expected<void, std::error_code> Client::connect(std::string_view ip, int port) {
+Result<void> Client::connect(std::string_view ip, int port) {
     if (!m_sockets) {
-        return zeus::unexpected(std::make_error_code(std::errc::not_connected));
+        return Result<void>::failure(ErrorCode::NotConnected);
     }
 
     if (m_connection != k_invalidConnection) {
-        return zeus::unexpected(std::make_error_code(std::errc::already_connected));
+        return Result<void>::failure(ErrorCode::AlreadyConnected);
     }
 
     if (ip.empty() || ip.find('\0') != std::string_view::npos || port < 1 || port > 65535) {
-        return zeus::unexpected(std::make_error_code(std::errc::invalid_argument));
+        return Result<void>::failure(ErrorCode::InvalidArgument);
     }
 
     SteamNetworkingIPAddr address{};
@@ -99,9 +94,7 @@ zeus::expected<void, std::error_code> Client::connect(std::string_view ip, int p
     } else if (inet_pton(AF_INET6, literal.c_str(), &ipv6) == 1) {
         address.SetIPv6(ipv6.s6_addr, destinationPort);
     } else {
-        return zeus::unexpected(
-            std::make_error_code(std::errc::invalid_argument)
-        );
+        return Result<void>::failure(ErrorCode::InvalidArgument);
     }
 
     SteamNetworkingConfigValue_t option{};
@@ -117,22 +110,20 @@ zeus::expected<void, std::error_code> Client::connect(std::string_view ip, int p
         &option
     );
 
-    if (m_connection == k_HSteamNetConnection_Invalid) {
-        return zeus::unexpected(
-            std::make_error_code(std::errc::io_error)
-        );
+    if (m_connection == k_invalidConnection) {
+        return Result<void>::failure(ErrorCode::IoError);
     }
 
     return {};
 }
 
-zeus::expected<void, std::error_code> Client::update(int maxMessagesToProcess) {
+Result<void> Client::update(int maxMessagesToProcess) {
     if (!m_sockets) {
-        return zeus::unexpected(std::make_error_code(std::errc::not_connected));
+        return Result<void>::failure(ErrorCode::NotConnected);
     }
 
     if (updating) {
-        return zeus::unexpected(std::make_error_code(std::errc::operation_in_progress));
+        return Result<void>::failure(ErrorCode::OperationInProgress);
     }
     updating = true;
     struct UpdateGuard {
@@ -146,7 +137,7 @@ zeus::expected<void, std::error_code> Client::update(int maxMessagesToProcess) {
         return {};
     }
 
-    if (m_connection == k_HSteamNetConnection_Invalid) {
+    if (m_connection == k_invalidConnection) {
         connected = false;
         return {};
     }
@@ -171,7 +162,7 @@ zeus::expected<void, std::error_code> Client::update(int maxMessagesToProcess) {
         const auto connection = std::exchange(m_connection, k_invalidConnection);
         connected = false;
         m_sockets->CloseConnection(connection, 0, nullptr, false);
-        return zeus::unexpected(std::make_error_code(std::errc::io_error));
+        return Result<void>::failure(ErrorCode::IoError);
     }
     if (count == 0) {
         return {};
@@ -181,8 +172,8 @@ zeus::expected<void, std::error_code> Client::update(int maxMessagesToProcess) {
     for (int i = 0; i < count && m_connection == receivingConnection; ++i) {
         SteamNetworkingMessage_t* message = messages[i];
 
-        tcb::span<const std::byte> convertedMessage{
-            static_cast<const std::byte*>(message->m_pData),
+        std::string_view convertedMessage{
+            static_cast<const char*>(message->m_pData),
             static_cast<std::size_t>(message->m_cbSize)
         };
 
@@ -197,11 +188,9 @@ zeus::expected<void, std::error_code> Client::update(int maxMessagesToProcess) {
     return {};
 }
 
-zeus::expected<void, std::error_code> Client::disconnect(bool enableLinger) {
+Result<void> Client::disconnect(bool enableLinger) {
     if (!m_sockets || m_connection == k_invalidConnection) {
-        return zeus::unexpected(
-            std::make_error_code(std::errc::not_connected)
-        );
+        return Result<void>::failure(ErrorCode::NotConnected);
     }
 
     if
@@ -216,14 +205,14 @@ zeus::expected<void, std::error_code> Client::disconnect(bool enableLinger) {
         return {};
     }
 
-    return zeus::unexpected(std::make_error_code(std::errc::io_error));
+    return Result<void>::failure(ErrorCode::IoError);
 }
 
 bool Client::isConnected() const noexcept {
     return connected;
 }
 
-HSteamNetConnection Client::getServerHConn() const noexcept {
+ConnectionHandle Client::getServerHConn() const noexcept {
     return m_connection;
 }
 

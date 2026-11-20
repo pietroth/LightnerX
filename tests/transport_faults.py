@@ -19,12 +19,11 @@ source = r'''
 #include <cstdint>
 #include <limits>
 #include <optional>
-#include <system_error>
+#include <string_view>
 #include <utility>
 #include <vector>
-#include <tcb/span.hpp>
-#include <zeus/expected.hpp>
 #include <steam/steamnetworkingsockets.h>
+#include <lightnerx/network/connection_handle.hpp>
 std::vector<HSteamNetConnection> sent;
 std::uint32_t lastSendSize = 0;
 std::optional<std::size_t> reportedMessageSize;
@@ -32,7 +31,7 @@ bool initialized = true;
 int released = 0;
 
 // Exercise the transport's size conversion without allocating a large buffer.
-std::size_t transportMessageSize(tcb::span<const std::byte> message) {
+std::size_t transportMessageSize(std::string_view message) {
     return reportedMessageSize.value_or(message.size());
 }
 
@@ -45,7 +44,6 @@ struct TestSockets {
 };
 TestSockets* injectedSockets() { static TestSockets sockets; return &sockets; }
 namespace lightnerx::network {
-    constexpr HSteamNetConnection k_invalidConnection = k_HSteamNetConnection_Invalid;
     bool isNetworkInitialized() { return initialized; }
     struct ConnectionManager {
         std::vector<HSteamNetConnection> handles;
@@ -57,9 +55,24 @@ namespace lightnerx::network {
     namespace detail { void setNetworkCleanup(void (*)() noexcept) noexcept {} }
 }
 '''
+source += r"""
+struct TestMessage : SteamNetworkingMessage_t {
+    TestMessage() : SteamNetworkingMessage_t{} {
+        m_pfnRelease = [](SteamNetworkingMessage_t* message) {
+            ++released;
+            delete static_cast<TestMessage*>(message);
+        };
+    }
+};
+struct TestUtils {
+    SteamNetworkingMessage_t* AllocateMessage(int) { return new TestMessage; }
+};
+TestUtils* injectedUtils() { static TestUtils utils; return &utils; }
+"""
 for path in ['network/target.cpp', 'network/transport.cpp', 'network/message_batch.cpp']:
     implementation = body(path).replace('ISteamNetworkingSockets*', 'TestSockets*').replace(
-        'SteamNetworkingSockets()', 'injectedSockets()')
+        'SteamNetworkingSockets()', 'injectedSockets()').replace(
+        'SteamNetworkingUtils()', 'injectedUtils()')
     if path == 'network/transport.cpp':
         implementation = replace_once(implementation, 'message.size()', 'transportMessageSize(message)')
     source += '\n' + implementation
@@ -72,15 +85,11 @@ using namespace lightnerx::network;
     } \
 } while (false)
 
-struct TestMessage : SteamNetworkingMessage_t {
-    TestMessage() : SteamNetworkingMessage_t{} {
-        m_pfnRelease = [](SteamNetworkingMessage_t* message) {
-            ++released;
-            delete static_cast<TestMessage*>(message);
-        };
-    }
-};
-OutboundMessage outgoing(Target target) { return {new TestMessage, std::move(target)}; }
+OutboundMessage outgoing(Target target) {
+    auto message = OutboundMessage::create({}, {}, std::move(target));
+    CHECK(message);
+    return std::move(message).value();
+}
 int main() {
     constexpr auto maxTransportSize = std::numeric_limits<std::uint32_t>::max();
     reportedMessageSize = maxTransportSize;
@@ -92,7 +101,7 @@ int main() {
     if constexpr (std::numeric_limits<std::size_t>::max() > maxTransportSize) {
         reportedMessageSize = static_cast<std::size_t>(maxTransportSize) + 2;
         const auto oversized = sendToConnection({}, 3);
-        if (oversized || oversized.error() != std::errc::message_size || !sent.empty()) {
+        if (oversized || oversized.error() != lightnerx::ErrorCode::MessageSize || !sent.empty()) {
             std::fputs("Oversized message was not rejected before calling the transport\n", stderr);
             return 1;
         }
@@ -101,15 +110,15 @@ int main() {
 
     ConnectionManager connections{{0, 2, 3, 4}};
     const auto group = sendToConnections({}, {0, 2, 3});
-    CHECK(!group && group.error() == std::errc::not_connected);
+    CHECK(!group && group.error() == lightnerx::ErrorCode::NotConnected);
     CHECK((sent == std::vector<HSteamNetConnection>{2, 3}));
     sent.clear();
     const auto reversed = sendToConnections({}, {2, 0, 3});
-    CHECK(!reversed && reversed.error() == std::errc::io_error);
+    CHECK(!reversed && reversed.error() == lightnerx::ErrorCode::IoError);
     CHECK((sent == std::vector<HSteamNetConnection>{2, 3}));
     sent.clear();
     const auto broadcastError = broadcast({}, connections, {4});
-    CHECK(!broadcastError && broadcastError.error() == std::errc::not_connected);
+    CHECK(!broadcastError && broadcastError.error() == lightnerx::ErrorCode::NotConnected);
     CHECK((sent == std::vector<HSteamNetConnection>{2, 3}));
     sent.clear();
     CHECK(broadcast({}, connections, {0, 2}));
@@ -121,33 +130,28 @@ int main() {
     CHECK(sent.empty());
     initialized = true;
 
-    bool rejectedCapacity = false;
-    try {
-        initMessagesBatcher(-1);
-    } catch (const std::invalid_argument&) {
-        rejectedCapacity = true;
-    }
-    CHECK(rejectedCapacity);
-    initMessagesBatcher(3);
+    const auto invalidCapacity = initMessagesBatcher(-1);
+    CHECK(!invalidCapacity && invalidCapacity.error() == lightnerx::ErrorCode::InvalidArgument);
+    CHECK(initMessagesBatcher(3));
     CHECK(queueMessage(outgoing(Target::single(2))));
     CHECK(queueMessage(outgoing(Target::single(0))));
     CHECK(queueMessage(outgoing(Target::single(3))));
     auto flushed = flushAll(connections);
-    CHECK(!flushed && flushed.error() == std::errc::not_connected);
+    CHECK(!flushed && flushed.error() == lightnerx::ErrorCode::NotConnected);
     CHECK(released == 3 && (sent == std::vector<HSteamNetConnection>{2, 3}));
     CHECK(flushAll(connections) && released == 3);
     sent.clear();
     CHECK(queueMessage(outgoing(Target::single(0))));
     CHECK(queueMessage(outgoing(Target::single(2))));
     flushed = flushAll(connections);
-    CHECK(!flushed && flushed.error() == std::errc::io_error && released == 5);
+    CHECK(!flushed && flushed.error() == lightnerx::ErrorCode::IoError && released == 5);
     sent.clear();
     CHECK(queueMessage(outgoing(Target::group({3, 4}))));
     CHECK(queueMessage(outgoing(Target::broadcast({0, 2, 4}))));
     CHECK(flushAll(connections) && released == 7);
     CHECK((sent == std::vector<HSteamNetConnection>{3, 4, 3}));
 
-    initMessagesBatcher(0);
+    CHECK(initMessagesBatcher(0));
     // reserve(0) retains prior capacity, just like the original implementation.
     // Fill the actual queue until rejection rather than assuming capacity shrinks.
     int queued = 0;
@@ -156,8 +160,10 @@ int main() {
     clearMessagesBatcher();
     CHECK(released == 8 + queued);
     CHECK(flushAll(connections));
-    const auto invalid = queueMessage({nullptr, Target::single(3)});
-    CHECK(!invalid && invalid.error() == std::errc::invalid_argument);
+    auto original = outgoing(Target::single(3));
+    auto moved = std::move(original);
+    const auto invalid = queueMessage(std::move(original));
+    CHECK(!invalid && invalid.error() == lightnerx::ErrorCode::InvalidArgument);
 }
 '''
 with tempfile.TemporaryDirectory(prefix='lightnerx-transport-') as directory:

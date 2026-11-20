@@ -5,11 +5,14 @@
 #include <lightnerx/network/network_manager.hpp>
 #include <lightnerx/communication/response.hpp>
 #include <array>
+#include <cstdlib>
 #include <lightnerx/network/server.hpp>
 
 namespace {
 struct ReserveMessageBatcher {
-    ReserveMessageBatcher() { lightnerx::network::initMessagesBatcher(1); }
+    ReserveMessageBatcher() {
+        if (!lightnerx::network::initMessagesBatcher(1)) std::abort();
+    }
 };
 
 // Reserve from a consumer translation unit before main().

@@ -7,11 +7,11 @@
 #include <cstdint>
 #include <cstring>
 #include <exception>
-#include <zeus/expected.hpp>
 #include <iostream>
-#include <tcb/span.hpp>
 #include <stdexcept>
-#include <system_error>
+#include <string>
+#include <string_view>
+#include <utility>
 #include <type_traits>
 #include <variant>
 #include <vector>
@@ -59,31 +59,30 @@ void record(c::Message message, std::uint16_t sender) {
         if constexpr (std::is_same_v<T, c::UnsuccessfulResponse>) mix(header.reasonCode);
     }, message.header);
     mix(message.payload.size());
-    for (auto byte : message.payload) mix(std::to_integer<unsigned>(byte));
+    for (auto byte : message.payload) mix(static_cast<unsigned char>(byte));
 }
 
-std::vector<std::byte> wire(const char* name, n::OutboundMessage outbound) {
-    const auto* first = static_cast<const std::byte*>(outbound.message->m_pData);
-    std::vector<std::byte> result(first, first + outbound.message->m_cbSize);
-    outbound.message->Release();
+std::string wire(const char* name, lightnerx::Result<n::OutboundMessage> outbound) {
+    if (!outbound) throw std::runtime_error(lightnerx::errorMessage(outbound.error()));
+    const std::string result(outbound.value().data());
     constexpr char digits[] = "0123456789abcdef";
     std::cout << name << '=';
     for (auto byte : result) {
-        const auto value = std::to_integer<unsigned>(byte);
+        const auto value = static_cast<unsigned char>(byte);
         std::cout << digits[value >> 4] << digits[value & 15];
     }
     std::cout << '\n';
     return result;
 }
 
-void error(const char* name, zeus::expected<void, std::error_code> result) {
+void error(const char* name, lightnerx::Result<void> result) {
     const char* label = "success";
     if (!result) {
         const auto code = result.error();
-        if (code == std::errc::not_connected) label = "not_connected";
-        else if (code == std::errc::invalid_argument) label = "invalid_argument";
-        else if (code == std::errc::resource_unavailable_try_again) label = "resource_unavailable_try_again";
-        else throw std::system_error(code, name);
+        if (code == lightnerx::ErrorCode::NotConnected) label = "not_connected";
+        else if (code == lightnerx::ErrorCode::InvalidArgument) label = "invalid_argument";
+        else if (code == lightnerx::ErrorCode::ResourceUnavailableTryAgain) label = "resource_unavailable_try_again";
+        else throw std::runtime_error(name);
     }
     std::cout << name << '=' << label << '\n';
 }
@@ -116,11 +115,16 @@ int main() {
         error("invalid-connection", n::sendToConnection({}, 0));
         error("empty-group", n::sendToConnections({}, {}));
         error("empty-flush", n::flushAll(connections));
-        error("null-queue", n::queueMessage({nullptr, n::Target::single(sender)}));
+        {
+            auto outbound = n::OutboundMessage::create({}, {}, n::Target::single(sender));
+            if (!outbound) throw std::runtime_error("empty outbound");
+            auto moved = std::move(outbound).value();
+            error("null-queue", n::queueMessage(std::move(outbound).value()));
+        }
 
-        const std::array payload{std::byte{0}, std::byte{0x7f}, std::byte{0xff}};
+        const std::string_view payload("\x00\x7f\xff", 3);
         const auto target = n::Target::single(sender);
-        std::vector<std::vector<std::byte>> frames;
+        std::vector<std::string> frames;
         frames.push_back(wire("event", c::event2OutboundMessage(c::Event(14, 0x1234), payload, target)));
         frames.push_back(wire("intention", c::intention2OutboundMessage(c::Intention(9, 48, 0xabcd), payload, target)));
         frames.push_back(wire("notification", c::notification2OutboundMessage(c::Notification(7, 47), payload, target)));
@@ -134,7 +138,7 @@ int main() {
         c::MessageInterpreter interpreter;
         interpreter.addAuthorityInterpretedMessageCallback([](c::Message message) { record(message, 0); });
         interpreter.addObedientInterpretedMessageCallback(record);
-        auto interpret = [&](tcb::span<const std::byte> bytes) {
+        auto interpret = [&](std::string_view bytes) {
             mix(++calls);
             interpreter.authorityInterpret(bytes);
             mix(++calls);
@@ -144,14 +148,14 @@ int main() {
         };
         for (auto frame : frames) {
             for (std::size_t length = 0; length <= frame.size(); ++length)
-                interpret(tcb::span{frame}.first(length));
-            frame.push_back(std::byte{});
+                interpret(std::string_view(frame).substr(0, length));
+            frame.push_back('\0');
             interpret(frame);
         }
         // Exhaust every response status, including tolerated extra payload bytes.
         for (unsigned status = 0; status < 256; ++status) {
             auto frame = frames[4];
-            frame[4] = static_cast<std::byte>(status);
+            frame[4] = static_cast<char>(status);
             interpret(frame);
         }
         std::uint32_t random = 0x4c58;
@@ -162,8 +166,8 @@ int main() {
             return random;
         };
         for (unsigned sample = 0; sample < 4096; ++sample) {
-            std::vector<std::byte> frame(next() % 65);
-            for (auto& byte : frame) byte = static_cast<std::byte>(next() & 255);
+            std::string frame(next() % 65, '\0');
+            for (auto& byte : frame) byte = static_cast<char>(next() & 255);
             if (frame.size() >= 2 && sample % 3 != 0) {
                 const auto size = static_cast<std::uint16_t>(sample % 3 == 1
                     ? frame.size() : ((frame.size() << 1) | (sample & 1)));

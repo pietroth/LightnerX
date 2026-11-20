@@ -1,19 +1,16 @@
 #ifndef LIGHTNERX_NETWORK_CLIENT_HPP
 #define LIGHTNERX_NETWORK_CLIENT_HPP
 
-#include "steam/isteamnetworkingsockets.h"
-#include "steam/steamnetworkingtypes.h"
-#include <steam/steamnetworkingsockets.h>
-#include <steam/isteamnetworkingutils.h>
-#include <cstddef>
 #include <deque>
-#include <zeus/expected.hpp>
 #include <functional>
-#include <tcb/span.hpp>
 #include <string_view>
-#include <system_error>
 
+#include <lightnerx/Result.hpp>
+#include <lightnerx/network/connection_handle.hpp>
 #include <lightnerx/network/network_manager.hpp>
+
+class ISteamNetworkingSockets;
+struct SteamNetConnectionStatusChangedCallback_t;
 
 namespace lightnerx::network {
     class Client {
@@ -21,11 +18,11 @@ namespace lightnerx::network {
         bool connected = false;
         bool updating = false;
 
-        using ServerReceivedMessageCallback = std::function<void(tcb::span<const std::byte>)>;
+        using ServerReceivedMessageCallback = std::function<void(std::string_view)>;
         std::deque<ServerReceivedMessageCallback> serverReceivedMessageCallbacks;
 
         ISteamNetworkingSockets* m_sockets = nullptr;
-        HSteamNetConnection m_connection = k_invalidConnection;
+        ConnectionHandle m_connection = k_invalidConnection;
 
         inline static Client* s_callbackInstance = nullptr;
 
@@ -38,19 +35,20 @@ namespace lightnerx::network {
 
         ~Client();
 
+        // The view borrows the receive buffer until the callback returns.
         void addServerReceivedMessageCallback(const ServerReceivedMessageCallback& callback);
 
-        zeus::expected<void, std::error_code> start();
+        Result<void> start();
 
-        zeus::expected<void, std::error_code> connect(std::string_view ip, int port);
+        Result<void> connect(std::string_view ip, int port);
 
-        zeus::expected<void, std::error_code> update(int maxMessagesToProcess);
+        Result<void> update(int maxMessagesToProcess);
 
-        zeus::expected<void, std::error_code> disconnect(bool enableLinger);
+        Result<void> disconnect(bool enableLinger);
 
         bool isConnected() const noexcept;
 
-        HSteamNetConnection getServerHConn() const noexcept;
+        ConnectionHandle getServerHConn() const noexcept;
 
     private:
         void onConnectionStatusChanged(

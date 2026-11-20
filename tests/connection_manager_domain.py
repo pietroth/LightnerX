@@ -10,7 +10,7 @@ from pathlib import Path
 import shlex
 import subprocess
 import tempfile
-from source_support import body
+from source_support import ROOT, body
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--compiler", default="c++")
@@ -84,5 +84,10 @@ with tempfile.TemporaryDirectory(prefix="lightnerx-id-domain-") as directory:
     cpp = Path(directory) / "domain.cpp"
     executable = Path(directory) / "domain"
     cpp.write_text(preamble + source + test)
-    subprocess.run([args.compiler, "-std=c++17", *shlex.split(args.flags), "-fno-sanitize-recover=all", str(cpp), "-o", str(executable)], check=True)
+    command = [
+        args.compiler, "-std=c++17", "-I" + str(ROOT / "include"),
+        *shlex.split(args.flags), "-fno-sanitize-recover=all",
+        str(cpp), "-o", str(executable),
+    ]
+    subprocess.run(command, check=True)
     subprocess.run([str(executable)], check=True, timeout=30)

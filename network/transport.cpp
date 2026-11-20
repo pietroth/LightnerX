@@ -1,36 +1,34 @@
 #include <lightnerx/network/transport.hpp>
 
+#include <steam/steamnetworkingsockets.h>
+
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
-#include <zeus/expected.hpp>
 #include <limits>
 #include <optional>
-#include <tcb/span.hpp>
-#include <system_error>
+#include <string_view>
 #include <vector>
 
 namespace lightnerx::network {
 
-zeus::expected<void, std::error_code> sendToConnection(
-        const tcb::span<const std::byte> message,
-        const HSteamNetConnection hConn
+Result<void> sendToConnection(
+        std::string_view message,
+        const ConnectionHandle hConn
     ) {
     if (!lightnerx::network::isNetworkInitialized()) {
-        return zeus::unexpected(std::make_error_code(std::errc::resource_unavailable_try_again));
+        return Result<void>::failure(ErrorCode::ResourceUnavailableTryAgain);
     }
 
     ISteamNetworkingSockets* pInterface = SteamNetworkingSockets();
 
     if (!pInterface || hConn == k_invalidConnection) {
-        return zeus::unexpected(
-            std::make_error_code(std::errc::not_connected)
-        );
+        return Result<void>::failure(ErrorCode::NotConnected);
     }
 
     const auto messageSize = message.size();
     if (messageSize > std::numeric_limits<std::uint32_t>::max()) {
-        return zeus::unexpected(std::make_error_code(std::errc::message_size));
+        return Result<void>::failure(ErrorCode::MessageSize);
     }
 
     EResult result = pInterface->SendMessageToConnection(
@@ -45,16 +43,14 @@ zeus::expected<void, std::error_code> sendToConnection(
         return {};
     }
 
-    return zeus::unexpected(
-        std::make_error_code(std::errc::io_error)
-    );
+    return Result<void>::failure(ErrorCode::IoError);
 }
 
-zeus::expected<void, std::error_code> sendToConnections(
-        const tcb::span<const std::byte> message,
-        const std::vector<HSteamNetConnection> connections
+Result<void> sendToConnections(
+        std::string_view message,
+        const std::vector<ConnectionHandle> connections
     ) {
-    std::optional<std::error_code> error;
+    std::optional<ErrorCode> error;
 
     for (auto conn : connections) {
         auto result = sendToConnection(message, conn);
@@ -65,20 +61,20 @@ zeus::expected<void, std::error_code> sendToConnections(
     }
 
     if (error) {
-        return zeus::unexpected(*error);
+        return Result<void>::failure(*error);
     }
 
     return {};
 }
 
-zeus::expected<void, std::error_code> broadcast(
-        const tcb::span<const std::byte> message,
+Result<void> broadcast(
+        std::string_view message,
         const lightnerx::network::ConnectionManager& connectionManager,
-        const std::vector<HSteamNetConnection> exceptions
+        const std::vector<ConnectionHandle> exceptions
     ) {
-    std::optional<std::error_code> error;
+    std::optional<ErrorCode> error;
 
-    connectionManager.forEach([&](uint16_t, HSteamNetConnection hConn) {
+    connectionManager.forEach([&](std::uint16_t, ConnectionHandle hConn) {
         if (std::find(exceptions.begin(), exceptions.end(), hConn) != exceptions.end()) {
             return ;
         }
@@ -91,7 +87,7 @@ zeus::expected<void, std::error_code> broadcast(
     });
 
     if (error) {
-        return zeus::unexpected(*error);
+        return Result<void>::failure(*error);
     }
 
     return {};

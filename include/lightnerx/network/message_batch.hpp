@@ -1,25 +1,45 @@
 #ifndef LIGHTNERX_NETWORK_MESSAGE_BATCH_HPP
 #define LIGHTNERX_NETWORK_MESSAGE_BATCH_HPP
 
-#include "steam/isteamnetworkingutils.h"
-#include <steam/steamnetworkingtypes.h>
-#include <zeus/expected.hpp>
-#include <system_error>
+#include <memory>
+#include <string_view>
 
-#include <lightnerx/network/transport.hpp>
-#include <lightnerx/network/network_manager.hpp>
+#include <lightnerx/Result.hpp>
 #include <lightnerx/network/target.hpp>
-#include <lightnerx/network/connection_manager.hpp>
+
+struct SteamNetworkingMessage_t;
 
 namespace lightnerx::network {
-    struct OutboundMessage {
-        SteamNetworkingMessage_t* message;
+    class ConnectionManager;
+
+    class OutboundMessage {
+    public:
+        static Result<OutboundMessage> create(
+            std::string_view header, std::string_view payload, Target target
+        );
+
+        // The view is valid while this object retains the message buffer.
+        [[nodiscard]] std::string_view data() const noexcept;
+
+    private:
+        struct ReleaseMessage {
+            void operator()(SteamNetworkingMessage_t* message) const noexcept;
+        };
+
+        OutboundMessage(SteamNetworkingMessage_t* message, Target target);
+
+        std::unique_ptr<SteamNetworkingMessage_t, ReleaseMessage> message;
         Target target;
+
+        friend Result<void> queueMessage(OutboundMessage message);
+        friend Result<void> flushAll(const ConnectionManager& connectionManager);
     };
+
     void clearMessagesBatcher() noexcept;
-    void initMessagesBatcher(int capacity);
-    zeus::expected<void, std::error_code> queueMessage(OutboundMessage message);
-    zeus::expected<void, std::error_code> flushAll(const ConnectionManager& connectionManager);
+    Result<void> initMessagesBatcher(int capacity);
+    Result<void> queueMessage(OutboundMessage message);
+    Result<void> queueMessage(Result<OutboundMessage> message);
+    Result<void> flushAll(const ConnectionManager& connectionManager);
 }
 
 #endif

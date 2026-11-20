@@ -1,33 +1,29 @@
 #ifndef LIGHTNERX_NETWORK_TRANSPORT_HPP
 #define LIGHTNERX_NETWORK_TRANSPORT_HPP
 
-#include "steam/isteamnetworkingsockets.h"
-#include "steam/steamclientpublic.h"
-#include "steam/steamnetworkingtypes.h"
-#include <cstddef>
-#include <zeus/expected.hpp>
-#include <tcb/span.hpp>
-#include <system_error>
+#include <string_view>
 #include <vector>
 
+#include <lightnerx/Result.hpp>
+#include <lightnerx/network/connection_handle.hpp>
 #include <lightnerx/network/connection_manager.hpp>
 #include <lightnerx/network/network_manager.hpp>
 
 namespace lightnerx::network {
-    zeus::expected<void, std::error_code> sendToConnection(
-        const tcb::span<const std::byte> message,
-        const HSteamNetConnection hConn
+    Result<void> sendToConnection(
+        std::string_view message,
+        const ConnectionHandle hConn
     );
 
-    zeus::expected<void, std::error_code> sendToConnections(
-        const tcb::span<const std::byte> message,
-        const std::vector<HSteamNetConnection> connections
+    Result<void> sendToConnections(
+        std::string_view message,
+        const std::vector<ConnectionHandle> connections
     );
 
-    zeus::expected<void, std::error_code> broadcast(
-        const tcb::span<const std::byte> message,
+    Result<void> broadcast(
+        std::string_view message,
         const lightnerx::network::ConnectionManager& connectionManager,
-        const std::vector<HSteamNetConnection> exceptions
+        const std::vector<ConnectionHandle> exceptions
     );
 }
 #endif

@@ -1,8 +1,6 @@
 #ifndef LIGHTNERX_NETWORK_CONNECTION_MANAGER_HPP
 #define LIGHTNERX_NETWORK_CONNECTION_MANAGER_HPP
 
-#include "steam/steamnetworkingtypes.h"
-#include <steam/isteamnetworkingsockets.h>
 #include <cstddef>
 #include <cstdint>
 #include <limits>
@@ -12,6 +10,7 @@
 #include <unordered_map>
 #include <vector>
 
+#include <lightnerx/network/connection_handle.hpp>
 #include <lightnerx/network/network_manager.hpp>
 
 namespace lightnerx::network {
@@ -19,16 +18,17 @@ namespace lightnerx::network {
 
     class ConnectionManager {
     private:
-        std::vector<HSteamNetConnection> clients;
-        std::unordered_map<HSteamNetConnection, uint16_t> clientIds;
+        std::vector<ConnectionHandle> clients;
+        std::unordered_map<ConnectionHandle, std::uint16_t> clientIds;
         int maxCapacity = 0;
         int onlineCount = 0;
 
-        std::set<uint16_t> freeIds;
-        uint32_t nextId = 1;
-        static constexpr uint32_t maxId = std::numeric_limits<uint16_t>::max();
+        std::set<std::uint16_t> freeIds;
+        std::uint32_t nextId = 1;
+        static constexpr std::uint32_t maxId = std::numeric_limits<std::uint16_t>::max();
 
     public:
+        // Capacities must be nonnegative.
         ConnectionManager(int initialReserve, int maxCapacity);
 
         ConnectionManager(const ConnectionManager&) = default;
@@ -40,11 +40,11 @@ namespace lightnerx::network {
 
         ConnectionManager& operator=(const ConnectionManager& other);
 
-        HSteamNetConnection getHSteamNetConnection(uint16_t id) const noexcept;
+        ConnectionHandle getHSteamNetConnection(std::uint16_t id) const noexcept;
 
-        std::optional<uint16_t> getClientId(HSteamNetConnection hConn) const noexcept;
+        std::optional<std::uint16_t> getClientId(ConnectionHandle hConn) const noexcept;
 
-        std::optional<uint16_t> add(HSteamNetConnection hConn);
+        std::optional<std::uint16_t> add(ConnectionHandle hConn);
 
         void remove(int id);
 
@@ -54,12 +54,12 @@ namespace lightnerx::network {
         void forEach(const Callback& callback) const {
             // Reload by index after each callback: add/remove may reallocate clients.
             // The entry-time bound prevents additions from extending this traversal.
-            const size_t limit = clients.size();
-            for (size_t id = 1; id < limit && id < clients.size(); ++id) {
-                HSteamNetConnection hConn = clients[id];
+            const std::size_t limit = clients.size();
+            for (std::size_t id = 1; id < limit && id < clients.size(); ++id) {
+                ConnectionHandle hConn = clients[id];
 
                 if (hConn != invalidConnection) {
-                    callback(static_cast<uint16_t>(id), hConn);
+                    callback(static_cast<std::uint16_t>(id), hConn);
                 }
             }
         }

@@ -89,9 +89,9 @@ for index in [0, 1]:
 
 context = '''
 int example(MessageInterpreter& interpreter, NotificationRegistry& registry,
-            ConnectionManager& connections, HSteamNetConnection connection,
-            HSteamNetConnection firstConnection, HSteamNetConnection secondConnection,
-            HSteamNetConnection connectionToSkip, tcb::span<const std::byte> bytes) {
+            ConnectionManager& connections, ConnectionHandle connection,
+            ConnectionHandle firstConnection, ConnectionHandle secondConnection,
+            ConnectionHandle connectionToSkip, std::string_view bytes) {
     const auto payload = bytes;
     const Event event{static_cast<std::uint16_t>((sizeof(Event) + payload.size()) << 1), 47};
 '''
@@ -109,12 +109,12 @@ template<class R, class C, class... A> struct signature<R(C::*)(A...) noexcept> 
 template<class R, class C, class... A> struct signature<R(C::*)(A...) const> { using type = std::tuple<R, std::tuple<A...>, std::true_type, std::false_type>; };
 template<class R, class C, class... A> struct signature<R(C::*)(A...) const noexcept> { using type = std::tuple<R, std::tuple<A...>, std::true_type, std::true_type>; };
 template<class T> using signature_t = typename signature<T>::type;
-struct Callback { void operator()(std::uint16_t, HSteamNetConnection) const {} };
+struct Callback { void operator()(std::uint16_t, ConnectionHandle) const {} };
 '''
 classes = {0: 'BaseProtocol', 1: 'MBT', 2: 'Event', 3: 'Notification', 4: 'NotificationRegistry',
            5: 'Intention', 6: 'Response', 7: 'UnsuccessfulResponse', 10: 'MessageInterpreter',
            11: 'MessageInterpreter', 12: 'MessageInterpreter', 15: 'Server', 16: 'Server',
-           17: 'Client', 18: 'ConnectionManager', 24: 'Target'}
+           17: 'Client', 18: 'ConnectionManager', 24: 'Target', 26: 'OutboundMessage'}
 for index, actual in classes.items():
     code = take('api.md', index)
     declared = re.sub(r'\b' + actual + r'\s*\(', 'Declared(', code)
@@ -133,9 +133,12 @@ for index, namespace in [(13, 'communication'), (14, 'network'), (20, 'network')
     code = take('api.md', index)
     checks = ''
     for name in re.findall(r'(\w+)\s*\(', code):
-        checks += 'static_assert(std::is_same_v<decltype(&declared::' + name + '), decltype(&lightnerx::' + namespace + '::' + name + ')>);\n'
+        if name == 'queueMessage':
+            checks += 'static_assert(static_cast<decltype(&declared::queueMessage)>(&lightnerx::network::queueMessage) != nullptr);\n'
+        else:
+            checks += 'static_assert(std::is_same_v<decltype(&declared::' + name + '), decltype(&lightnerx::' + namespace + '::' + name + ')>);\n'
     emit('api_' + str(index), headers + using + 'namespace api_' + str(index) + ' { namespace declared {\n' + code + '}\n' + checks + '}\n')
-for index, actual, fields in [(9, 'Message', ['header', 'payload']), (25, 'Target', ['connection', 'broadcastExceptions']), (26, 'OutboundMessage', ['message', 'target'])]:
+for index, actual, fields in [(9, 'Message', ['header', 'payload']), (25, 'Target', ['connection', 'broadcastExceptions'])]:
     code = take('api.md', index)
     if index == 25:
         code = 'struct Declared {\n' + code + '};\n'

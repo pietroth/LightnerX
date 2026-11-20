@@ -9,7 +9,7 @@ import pathlib
 import shlex
 import subprocess
 import tempfile
-from source_support import INCLUDE_FLAGS, body
+from source_support import INCLUDE_FLAGS, body, replace_once
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--compiler', default='g++')
@@ -41,9 +41,9 @@ source = r'''
 #include <utility>
 #include <variant>
 #include <vector>
-#include <tcb/span.hpp>
-#include <zeus/expected.hpp>
 #include <steam/isteamnetworkingutils.h>
+#include <lightnerx/Result.hpp>
+std::optional<std::size_t> reportedPayloadSize;
 bool failAllocation = false, throwSend = false;
 int liveMessages = 0;
 int sendsBeforeThrow = 0;
@@ -77,14 +77,14 @@ namespace lightnerx::network {
         }
     };
     namespace detail { void setNetworkCleanup(void (*hook)() noexcept) { cleanupHook = hook; } }
-    zeus::expected<void, std::error_code> sendToConnection(tcb::span<const std::byte>, HSteamNetConnection) {
+    lightnerx::Result<void> sendToConnection(std::string_view, HSteamNetConnection) {
         if (throwSend && sendsBeforeThrow-- == 0) throw 23;
-        return zeus::unexpected(std::make_error_code(std::errc::io_error));
+        return Result<void>::failure(ErrorCode::IoError);
     }
-    zeus::expected<void, std::error_code> sendToConnections(tcb::span<const std::byte> data, std::vector<HSteamNetConnection>) {
+    lightnerx::Result<void> sendToConnections(std::string_view data, std::vector<HSteamNetConnection>) {
         return sendToConnection(data, 0);
     }
-    zeus::expected<void, std::error_code> broadcast(tcb::span<const std::byte> data, const ConnectionManager&, std::vector<HSteamNetConnection>) {
+    lightnerx::Result<void> broadcast(std::string_view data, const ConnectionManager&, std::vector<HSteamNetConnection>) {
         return sendToConnection(data, 0);
     }
 }
@@ -93,7 +93,12 @@ for path in ['communication/base_protocol.cpp', 'communication/mbt.cpp',
              'communication/intention.cpp', 'communication/notification.cpp',
              'communication/event.cpp', 'communication/response.cpp',
              'network/target.cpp', 'network/message_batch.cpp', 'communication/message.cpp']:
-    source += '\n' + body(path).replace('SteamNetworkingUtils()', 'injectedUtils()')
+    implementation = body(path).replace('SteamNetworkingUtils()', 'injectedUtils()')
+    if path == 'network/message_batch.cpp':
+        implementation = replace_once(
+            implementation, 'payload.size() > maxSize - header.size()',
+            'reportedPayloadSize.value_or(payload.size()) > maxSize - header.size()')
+    source += '\n' + implementation
 source += '\n' + (root / 'tests/messages.cpp').read_text()
 with tempfile.TemporaryDirectory(prefix='lightnerx-message-test-') as directory:
     cpp = pathlib.Path(directory) / 'messages.cpp'

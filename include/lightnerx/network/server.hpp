@@ -1,34 +1,30 @@
 #ifndef LIGHTNERX_NETWORK_SERVER_HPP
 #define LIGHTNERX_NETWORK_SERVER_HPP
 
-#include "steam/isteamnetworkingsockets.h"
-#include "steam/steamnetworkingtypes.h"
-#include <steam/steamnetworkingsockets.h>
-#include <steam/isteamnetworkingutils.h>
-#include <cstddef>
 #include <cstdint>
 #include <deque>
-#include <exception>
-#include <zeus/expected.hpp>
 #include <functional>
-#include <tcb/span.hpp>
-#include <system_error>
+#include <string_view>
 
+#include <lightnerx/Result.hpp>
+#include <lightnerx/network/connection_handle.hpp>
 #include <lightnerx/network/network_manager.hpp>
 
+class ISteamNetworkingSockets;
+struct SteamNetConnectionStatusChangedCallback_t;
+
 namespace lightnerx::network {
-    inline constexpr HSteamListenSocket k_invalidSocket = 0;
-    inline constexpr HSteamNetPollGroup k_invalidPollGroup = 0;
+    inline constexpr std::uint32_t k_invalidSocket = 0;
+    inline constexpr std::uint32_t k_invalidPollGroup = 0;
 
     class Server {
     private:
         ISteamNetworkingSockets* m_pInterface = nullptr;
-        HSteamListenSocket m_hListenSocket = k_invalidSocket;
-        HSteamNetPollGroup m_hPollGroup = k_invalidPollGroup;
+        std::uint32_t m_hListenSocket = k_invalidSocket;
+        std::uint32_t m_hPollGroup = k_invalidPollGroup;
         bool updating = false;
         bool closeRequested = false;
         unsigned activeCalls = 0;
-        std::exception_ptr callbackException;
 
         struct ActiveCall {
             Server& server;
@@ -38,13 +34,13 @@ namespace lightnerx::network {
             }
         };
 
-        using ClientConnectedCallback = std::function<void(HSteamNetConnection)>;
+        using ClientConnectedCallback = std::function<void(ConnectionHandle)>;
         std::deque<ClientConnectedCallback> clientConnectedCallbacks;
 
-        using ClientDisconnectedCallback = std::function<void(HSteamNetConnection)>;
+        using ClientDisconnectedCallback = std::function<void(ConnectionHandle)>;
         std::deque<ClientDisconnectedCallback> clientDisconnectedCallbacks;
 
-        using ClientReceivedMessageCallback = std::function<void(tcb::span<const std::byte>, HSteamNetConnection)>;
+        using ClientReceivedMessageCallback = std::function<void(std::string_view, ConnectionHandle)>;
         std::deque<ClientReceivedMessageCallback> clientReceivedMessageCallbacks;
 
     public:
@@ -55,18 +51,20 @@ namespace lightnerx::network {
         Server& operator=(Server&&) = delete;
         ~Server();
 
+        // Connection status callbacks run inside the transport and must not throw.
         void addClientConnectedCallback(ClientConnectedCallback callback);
 
         void addClientDisconnectedCallback(ClientDisconnectedCallback callback);
 
+        // The view borrows the receive buffer until the callback returns.
         void addClientReceivedMessageCallback(ClientReceivedMessageCallback callback);
 
-        zeus::expected<void, std::error_code> start(int port, uint32_t timeoutConnected);
+        Result<void> start(int port, std::uint32_t timeoutConnected);
 
-        zeus::expected<void, std::error_code> update();
+        Result<void> update();
 
-        zeus::expected<void, std::error_code> disconnectConnection(
-            HSteamNetConnection hConn, bool enableLinger
+        Result<void> disconnectConnection(
+            ConnectionHandle hConn, bool enableLinger
         );
 
         void close() noexcept;
