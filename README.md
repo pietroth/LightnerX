@@ -273,15 +273,22 @@ const communication::Notification notification{
 
 ### Update and send to the server
 
-Process up to 32 messages per update and send when `isConnected()` indicates an established connection. `Target::single` selects the server's handle.
+Process up to 32 messages per update and send when `isConnected()` indicates an established connection. `Target::single` selects the server's handle. The handle can become invalid during a successful update when the peer closes the connection. The example exits when that happens and gives a pending attempt ten seconds to connect.
 
 ```cpp
+const auto connectDeadline = std::chrono::steady_clock::now() + 10s;
+bool connectedOnce = false;
 while (true) {
     if (const auto result = client.update(32); !result) {
         std::cout << "Failed to update: " << lightnerx::errorMessage(result.error()) << '\n';
         break;
     }
+    if (client.getServerHConn() == network::k_invalidConnection) {
+        std::cout << (connectedOnce ? "Connection closed\n" : "Connection attempt failed\n");
+        return connectedOnce ? 0 : 1;
+    }
     if (client.isConnected()) {
+        connectedOnce = true;
         if (const auto result = network::queueMessage(communication::notification2OutboundMessage(
                 notification, payload, network::Target::single(client.getServerHConn()))); !result) {
             std::cout << "Failed to queue: " << lightnerx::errorMessage(result.error()) << '\n';
@@ -291,6 +298,9 @@ while (true) {
             std::cout << "Failed to send: " << lightnerx::errorMessage(result.error()) << '\n';
             break;
         }
+    } else if (!connectedOnce && std::chrono::steady_clock::now() >= connectDeadline) {
+        std::cout << "Connection attempt timed out\n";
+        break;
     }
     std::this_thread::sleep_for(3000ms);
 }
@@ -298,7 +308,7 @@ while (true) {
 
 ### Shut down the client
 
-When exiting due to an error, the `Client` destructor closes the connection and shuts down the network. Returning `1` indicates the failure that interrupted the example.
+On exit, the `Client` destructor closes any remaining connection and shuts down the network. Returning `1` indicates a failure during connection establishment or message processing.
 
 ```cpp
 return 1; // The Client destructor closes the connection and shuts down the network.
@@ -415,6 +425,7 @@ int main() {
 #include <thread>
 
 #include <lightnerx/network/client.hpp>
+#include <lightnerx/network/connection_handle.hpp>
 #include <lightnerx/network/connection_manager.hpp>
 #include <lightnerx/network/message_batch.hpp>
 #include <lightnerx/network/target.hpp>
@@ -458,12 +469,19 @@ int main() {
         47 // The server must register this ID in NotificationRegistry.
     };
 
+    const auto connectDeadline = std::chrono::steady_clock::now() + 10s;
+    bool connectedOnce = false;
     while (true) {
         if (const auto result = client.update(32); !result) {
             std::cout << "Failed to update: " << lightnerx::errorMessage(result.error()) << '\n';
             break;
         }
+        if (client.getServerHConn() == network::k_invalidConnection) {
+            std::cout << (connectedOnce ? "Connection closed\n" : "Connection attempt failed\n");
+            return connectedOnce ? 0 : 1;
+        }
         if (client.isConnected()) {
+            connectedOnce = true;
             if (const auto result = network::queueMessage(communication::notification2OutboundMessage(
                     notification, payload, network::Target::single(client.getServerHConn()))); !result) {
                 std::cout << "Failed to queue: " << lightnerx::errorMessage(result.error()) << '\n';
@@ -473,6 +491,9 @@ int main() {
                 std::cout << "Failed to send: " << lightnerx::errorMessage(result.error()) << '\n';
                 break;
             }
+        } else if (!connectedOnce && std::chrono::steady_clock::now() >= connectDeadline) {
+            std::cout << "Connection attempt timed out\n";
+            break;
         }
         std::this_thread::sleep_for(3000ms);
     }
