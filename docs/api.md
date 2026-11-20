@@ -163,7 +163,7 @@ struct Message {
 };
 ```
 
-Use `std::visit(visitor, message.header)` to examine the type stored in `header`. The header is a value; `payload` references the buffer provided to the interpreter. To use the payload after the receive callback, copy the bytes into application storage.
+Use `std::visit(visitor, message.header)` to examine the type stored in `header`. The header is a value. The `payload` view borrows the buffer passed to the interpreter. To use the payload after a network receive callback, copy the bytes into application storage before returning.
 
 ### `lightnerx::communication::MessageInterpreter`
 
@@ -256,15 +256,17 @@ void networkKill();
 bool isNetworkInitialized();
 ```
 
-`networkInit()` initializes GameNetworkingSockets and is idempotent. `isNetworkInitialized()` reports whether the registered runtime and interface exist. Without a started wrapper, `networkKill()` releases queued messages, shuts down networking and resets the state; it is safe to call repeatedly and initialize again.
+`networkInit()` initializes GameNetworkingSockets and returns `true` on success, including when the network is already initialized. It returns `false` if initialization fails. `isNetworkInitialized()` reports whether the registered runtime and interface exist. Without a started wrapper, `networkKill()` releases queued messages, shuts down networking and resets the state. It is safe to call repeatedly and initialize again.
 
-A single LightnerX library instance allows exactly one started `Client` or `Server` to own the runtime. Starting the same owner again returns `ErrorCode::OperationInProgress`. Starting another owner returns `device_or_resource_busy`. Both types are noncopyable and nonmovable. A failed start releases resources created by that attempt and permits retry. If the application initialized the network manually, the failed attempt preserves the runtime, existing connections and pending messages. A successful start adopts that runtime. The server close or the client destructor releases ownership and shuts down the adopted runtime. For multiple plugins, use one [shared LightnerX library](setup.md#consuming-with-cmake) across the process.
+A single LightnerX library instance allows exactly one started `Client` or `Server` to own the runtime. Starting the same owner again returns `ErrorCode::OperationInProgress`. A valid start request from another owner returns `ErrorCode::DeviceOrResourceBusy`. Both wrappers return `ErrorCode::IoError` if the transport cannot initialize or supply its interface. Both types are noncopyable and nonmovable. A failed start releases resources created by that attempt and permits retry. If the application initialized the network manually, the failed attempt preserves the runtime, existing connections and pending messages. A successful start adopts that runtime. The server close or the client destructor releases ownership and shuts down the adopted runtime. For multiple plugins, use one shared LightnerX library across the process. See [consuming with CMake](setup.md#consuming-with-cmake).
 
 While a wrapper owns the runtime, `networkKill()` defers shutdown until that owner releases it. The interface remains usable and `isNetworkInitialized()` remains true in the meantime. Direct external `GameNetworkingSockets_Kill()` and raw `RunCallbacks()` during wrapper ownership are unsupported; use LightnerX lifecycle and update operations. Synchronize all network operations across threads in the application.
 
 `g_bNetworkInitialized` is a legacy public flag maintained by LightnerX. Use `isNetworkInitialized()` to query the runtime state and the lifecycle functions to change it.
 
-`k_invalidConnection` is declared once in `<lightnerx/network/network_manager.hpp>`, which is included by the client and transport headers.
+## `<lightnerx/network/connection_handle.hpp>`
+
+`lightnerx::network::ConnectionHandle` is an alias for `std::uint32_t`. The same header defines `lightnerx::network::k_invalidConnection` as zero. Use the constant to check whether a handle is absent. These transport handles are distinct from the client IDs assigned by `ConnectionManager`.
 
 ## `<lightnerx/network/server.hpp>`
 
@@ -309,11 +311,13 @@ lightnerx::Result<void> disconnectConnection(
 void close() noexcept;
 ```
 
-`start()` initializes the network and opens the listen socket on the specified port (1–65535); `timeoutConnected` is passed to GameNetworkingSockets in milliseconds. Its maximum accepted value is `INT32_MAX` (2,147,483,647 ms), although the parameter type is `uint32_t`. For an unstarted server, a value above this limit returns `ErrorCode::InvalidArgument` before initializing the network or opening the listen socket. Calling `start()` on an already started server returns `ErrorCode::OperationInProgress` first. After a successful start, `update()` processes network callbacks and up to one available message in the poll group.
+`start()` initializes the network and opens the listen socket on the specified port (1–65535). `timeoutConnected` configures the transport timeout for established connections, in milliseconds, and accepts values from zero to `INT32_MAX` (2,147,483,647 ms). An out-of-range port or timeout returns `ErrorCode::InvalidArgument` before initialization. A start on an already started server returns `ErrorCode::OperationInProgress` before checking the arguments. Failure to create the listen socket or poll group returns `ErrorCode::ResourceUnavailableTryAgain`. After a successful start, `update()` processes network callbacks and up to one available message in the poll group. An empty receive queue is a successful update.
 
 The connection callback runs after acceptance and assignment to the poll group. If a callback disconnects that client, disconnection callbacks run as part of the disconnect call and subsequent connection callbacks for that handle are skipped. The receive callback provides the bytes and the source handle. The bytes remain valid during these callbacks.
 
-`disconnectConnection()` requests that a specific connection be closed and, on success, calls the disconnection callbacks. `enableLinger` is forwarded to the transport to control the attempt to send pending data when closing. `close()` closes the listen socket, destroys the poll group, and shuts down GameNetworkingSockets. It is idempotent and also runs from the destructor. A close requested inside a callback is completed after the outer operation releases received messages; remaining callbacks in that dispatch are skipped. Bulk close does not emit individual disconnection callbacks: clear application registrations before reusing a manager for a new session. Disconnection callbacks receive a historical handle after closure; `ConnectionManager::getClientId()` remains valid until `remove()`.
+`disconnectConnection()` requests that a specific connection be closed and, on success, calls the disconnection callbacks. `enableLinger` is forwarded to the transport to control the attempt to send pending data when closing. An unstarted server or a pending `close()` returns `ErrorCode::NotConnected`. A close rejected by the transport returns `ErrorCode::IoError`.
+
+`close()` closes the listen socket, destroys the poll group, and shuts down GameNetworkingSockets. It is idempotent and also runs from the destructor. A close requested inside a callback is completed after the outer operation releases received messages. Remaining callbacks in that dispatch are skipped. Bulk close bypasses individual disconnection callbacks and leaves application registrations in place. Clear them before reusing a manager for a new session. Disconnection callbacks receive a historical handle after closure. `ConnectionManager::getClientId()` remains valid until `remove()`.
 
 ## `<lightnerx/network/client.hpp>`
 
@@ -345,11 +349,13 @@ bool isConnected() const noexcept;
 lightnerx::network::ConnectionHandle getServerHConn() const noexcept;
 ```
 
-`start()` initializes the transport. `connect()` initiates the connection to a numeric IPv4 or IPv6 literal and the separate port argument. IPv6 may be enclosed in brackets. Hostnames, scope identifiers, embedded ports, embedded NULs and trailing characters are rejected with `ErrorCode::InvalidArgument`. After calling `connect()`, monitor `isConnected()` while calling `update()` to observe the connection being established. `update()` runs network callbacks and processes up to the specified number of messages; values less than or equal to zero run only the network callbacks.
+`start()` initializes the transport. `connect(ip, port)` initiates an asynchronous connection to a numeric IPv4 or IPv6 literal and a separate port in the range 1–65535. IPv6 may be enclosed in brackets. An invalid port, empty address, hostname, scope identifier, embedded port, embedded NUL or trailing character returns `ErrorCode::InvalidArgument`. Calling `connect()` before `start()` returns `ErrorCode::NotConnected`. An existing or pending connection returns `ErrorCode::AlreadyConnected`. The transport's failure to initiate the connection returns `ErrorCode::IoError`. Constructing the address string can propagate `std::bad_alloc` or `std::length_error`.
 
-`getServerHConn()` returns the handle used to send messages to the server, for example with `Target::single(client.getServerHConn())`. The receive callback is stored by the client, and the provided view remains valid during its execution.
+`update(maxMessagesToProcess)` runs network callbacks and processes up to that many messages. Values less than or equal to zero run only the network callbacks. With a pending or established handle and a positive limit, the receive step allocates message slots up to that limit and can propagate an allocation or container size exception. An initialized client with no handle can update successfully.
 
-`disconnect()` requests that the connection be closed and forwards `enableLinger` to the transport. On success it immediately invalidates the handle and clears `isConnected()`, allowing another `connect()` on the same instance. It retains ownership of the runtime until the destructor. Disconnecting inside a receive callback stops further callbacks and messages from that receive batch; all acquired messages are released. The destructor closes the existing connection and shuts down networking.
+After `connect()` succeeds, call `update()` and monitor `isConnected()` for establishment. `getServerHConn()` returns a handle as soon as the attempt starts, or `k_invalidConnection` if no connection is pending or active. For sending, wait for `isConnected()` and use the handle, for example with `Target::single(client.getServerHConn())`. When `update()` processes a closure from the peer or a locally detected transport problem, it clears `isConnected()` and invalidates the handle. The update can still succeed, so check the handle to detect that the attempt or session has ended. The receive callback is stored by the client, and the provided view remains valid during its execution.
+
+`disconnect()` requests that the connection be closed and forwards `enableLinger` to the transport. An unstarted client or missing handle returns `ErrorCode::NotConnected`. A close rejected by the transport returns `ErrorCode::IoError`. On success, the client immediately invalidates the handle and clears `isConnected()`, allowing another `connect()` on the same instance. It retains ownership of the runtime until the destructor. Disconnecting inside a receive callback stops further callbacks and messages from that receive batch. All acquired messages are released. The destructor closes the existing connection and shuts down networking.
 
 ## `<lightnerx/network/connection_manager.hpp>`
 
@@ -377,11 +383,11 @@ template<class Callback>
 void forEach(const Callback& callback) const;
 ```
 
-`initialReserve` reserves storage space, and `maxCapacity` defines the maximum number of registered connections. `add` registers a handle and returns the assigned ID, or an empty `std::optional` when registration is not performed. `remove` unregisters the ID; closing the connection is handled by the networking component.
+`maxCapacity` limits the number of registered connections and is capped at 65535. `initialReserve` reserves storage for up to that many connections within the configured capacity. A negative constructor argument terminates the process. `add(hConn)` requires an initialized network and a handle recognized by GameNetworkingSockets. It returns the assigned ID, or `std::nullopt` when the network is unavailable, the handle is invalid or already registered, or the manager is at capacity. `remove(id)` unregisters an ID and makes it available for reuse. A missing or out-of-range ID has no effect. Closing the underlying connection is handled by the networking component. The constructor, `add()`, and `remove()` can propagate allocation exceptions. If registration or removal fails during allocation, the existing mappings remain intact.
 
 Copying a manager produces independent registrations. If copy assignment throws, the destination preserves its mappings, count, capacity and ID allocation state. A successful move transfers the registrations and ID allocation state. The source becomes empty, retains its configured maximum capacity and starts assigning IDs at 1 again.
 
-`getHSteamNetConnection` looks up a handle by its internal ID and returns `0` when there is no handle at that position. `getClientId` looks up the ID in this manager's local registration map, independently of GNS userdata or whether the handle has since closed. `getOnlineCount` returns the number of active registrations.
+`getHSteamNetConnection` looks up a handle by its internal ID and returns `k_invalidConnection` when there is no registration for the ID. `getClientId` looks up the ID in this manager's local registration map, independently of GNS userdata or whether the handle has since closed. It returns `std::nullopt` for an absent registration. `getOnlineCount` counts registered handles, including closed ones still registered with this manager.
 
 `forEach` calls the callback for each active registration, providing the ID and handle:
 
@@ -404,7 +410,16 @@ lightnerx::Result<void> sendToConnection(
 );
 ```
 
-Forwards the bytes to GameNetworkingSockets with the reliable send option. After checking the network and connection handle, the function returns `ErrorCode::MessageSize` if the byte count exceeds the transport's 32-bit length field. The return value indicates whether the transport accepted the send. This function uses the transport directly, bypassing the batcher queue.
+Sends the bytes in `message` to `hConn` through GameNetworkingSockets (GNS) using reliable delivery. This call bypasses the batcher and accepts raw bytes. Success means the transport accepted the message for sending.
+
+| Error | Condition |
+| --- | --- |
+| `ErrorCode::ResourceUnavailableTryAgain` | The network is uninitialized or unavailable. |
+| `ErrorCode::NotConnected` | The handle equals `k_invalidConnection`, or the transport interface is no longer available after checking initialization. |
+| `ErrorCode::MessageSize` | The byte count exceeds the 32-bit length field, after the initial network and handle checks. |
+| `ErrorCode::IoError` | GNS rejected the send, for example because the connection ended, its send buffer is full, or the message exceeds the GNS send limit. |
+
+For IP connections, the bundled GNS version limits each message to 512 KiB (524,288 bytes). A payload above that limit that still fits in the 32-bit length field reaches GNS and returns `ErrorCode::IoError`. When sending INER frames, apply the protocol's header and payload limits as well. See the [GNS send limit](https://github.com/ValveSoftware/GameNetworkingSockets/blob/d534c19aa760df3fb75fd20db13ba1932b8a5463/include/steam/steamnetworkingtypes.h#L843-L846) and the [INER binary representation](communication.md#binary-representation).
 
 ### Sending to a group
 
@@ -415,7 +430,7 @@ lightnerx::Result<void> sendToConnections(
 );
 ```
 
-Forwards the same bytes to each handle in the vector. Attempts all destinations and returns the first error encountered, if any.
+Forwards the same bytes to each handle in vector order, including repeated handles. Attempts all destinations and returns the first error from `sendToConnection()`, if any. An empty vector succeeds without sending. Copying a vector passed by lvalue can propagate `std::bad_alloc` before sending.
 
 ### Broadcast
 
@@ -427,7 +442,7 @@ lightnerx::Result<void> broadcast(
 );
 ```
 
-Forwards the same bytes to the connections registered in `ConnectionManager`, except for the handles in `exceptions`. Attempts all selected destinations and returns the first error encountered, if any. For direct sending, the third argument is required; use `{}` to include all connections:
+Forwards the same bytes to the connections registered in `connectionManager`, excluding the handles in `exceptions`. Attempts all selected destinations and returns the first error from `sendToConnection()`, if any. An empty selection succeeds without sending. Copying an exceptions vector passed by lvalue can propagate `std::bad_alloc` before sending. Pass `{}` as the required third argument to include all registered handles.
 
 ```cpp
 const auto all = lightnerx::network::broadcast(bytes, connections, {});
@@ -531,10 +546,10 @@ You can also queue multiple messages before calling `flushAll`. The batcher keep
 
 Both interpretation methods accept exactly one complete message. The declared total size must equal the supplied view and include the entire header. Authority sizes are decoded from 15 bits (maximum 32767 bytes); Obedient sizes use 16 bits (maximum 65535 bytes). Truncated headers, mismatched sizes, unknown response status and unregistered Obedient origins produce no callback, matching the existing void parser interface. There is no incremental or concatenated-message framing.
 
-Callbacks run synchronously. Registration during a callback is safe; newly registered callbacks participate from the next dispatch, including a nested interpretation. Existing callback objects retain mutable state. Callbacks invoked during transport connection status dispatch must complete without throwing.
+Callbacks run synchronously. Registration during a callback is safe. Newly registered callbacks participate from the next dispatch, including a nested interpretation. Existing callback objects retain mutable state. An exception escaping a callback during transport connection status dispatch terminates the process. Receive and interpretation callbacks can propagate exceptions to the caller, and acquired receive buffers are released during unwinding.
 
 Recursive `update()` returns `ErrorCode::OperationInProgress`. Callbacks may disconnect or request `Server::close()`; do not destroy or assign the component executing a callback. Referenced objects must remain alive until dispatch finishes. A negative receive result returns `ErrorCode::IoError`, distinct from an empty queue; the client also clears and closes its failed connection. Updating an unstarted/closed wrapper returns `ErrorCode::NotConnected`.
 
-`ConnectionManager` owns an independent, bidirectional mapping; it neither reads nor writes GNS userdata. A handle may be registered once per manager. Adding a duplicate, invalid handle, or a handle beyond capacity returns `nullopt`. Different managers may independently register the same valid handle. `getClientId()` returns `nullopt` for an absent registration, including handle zero, and retains a registered identity after transport closure until removal. IDs range from 1 to 65535 and are recycled; capacity above 65535 is capped. Negative constructor arguments terminate the process. `forEach` visits the index range present on entry, safely allowing add/remove; it may observe replacements within that range but does not extend traversal for vector growth.
+`ConnectionManager` owns an independent, bidirectional mapping and leaves GNS userdata available to the application. Different managers may independently register the same valid handle. IDs range from 1 to 65535 and are recycled. `forEach` visits the index range present on entry in ascending ID order. It safely allows addition and removal during iteration and may observe replacements within the original range. An exception from the callback stops the traversal and propagates to the caller.
 
 The batch queue is global. `initMessagesBatcher()` reserves capacity without discarding queued messages. `clearMessagesBatcher()` releases pending messages and preserves capacity; actual network shutdown and queue destruction also release pending messages. `flushAll()` attempts all entries, releases the queue, and returns the last error. Serialize all batch operations, including clearing and shutdown.
