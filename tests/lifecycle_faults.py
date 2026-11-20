@@ -7,6 +7,7 @@ import argparse
 from pathlib import Path
 import subprocess
 import tempfile
+from module_source import ROOT, implementation
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--compiler', default='c++')
@@ -14,7 +15,6 @@ parser.add_argument('--library', type=Path, required=True)
 parser.add_argument('--sanitize', action='store_true')
 parser.add_argument('--baseline', action='store_true')
 args = parser.parse_args()
-root = Path(__file__).resolve().parents[1]
 
 source = r'''
 #include <bits/stdc++.h>
@@ -75,11 +75,9 @@ bool assignPollGroup(HSteamNetConnection handle, HSteamNetPollGroup group) {
 '''
 for name in ['network_manager', 'client', 'server']:
     path = 'network/' + name + '.cppm'
-    code = (subprocess.check_output(['git', 'show', 'HEAD:' + path], cwd=root, text=True)
-            if args.baseline else (root / path).read_text())
-    code = '\n'.join(line.replace('export ', '') for line in code.splitlines()
-                     if not line.startswith(('module;', 'export module ', 'import ', 'export import ')))
-    code = code.replace('private:', 'public:')
+    code = (subprocess.check_output(['git', 'show', 'HEAD:' + path], cwd=ROOT, text=True)
+            if args.baseline else (ROOT / path).read_text())
+    code = implementation(code).replace('private:', 'public:')
     for original, replacement in [
         ('m_sockets = SteamNetworkingSockets();', 'm_sockets = startupSockets();'),
         ('m_pInterface = SteamNetworkingSockets();', 'm_pInterface = startupSockets();'),
@@ -284,7 +282,7 @@ with tempfile.TemporaryDirectory(prefix='lightnerx-lifecycle-') as directory:
     executable = Path(directory) / 'lifecycle'
     cpp.write_text(source)
     command = [args.compiler, '-std=c++26', '-g', '-O1',
-               '-I' + str(root / 'external/GameNetworkingSockets/include'), str(cpp),
+               '-I' + str(ROOT / 'external/GameNetworkingSockets/include'), str(cpp),
                str(args.library.resolve()), '-Wl,-rpath,' + str(args.library.resolve().parent), '-o', str(executable)]
     if args.sanitize:
         # The pinned GNS build uses -fno-rtti. UBSan vptr diagnoses even the
