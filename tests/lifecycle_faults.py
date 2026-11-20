@@ -23,6 +23,7 @@ source = r'''
 int liveMessages = 0, clientReceive = 0, serverReceive = 0;
 bool failListener = false, failPoll = false;
 bool failInterface = false;
+bool failAccept = false, failPollAssignment = false;
 int networkCleanups = 0;
 ISteamNetworkingSockets* startupSockets() {
     return failInterface ? nullptr : SteamNetworkingSockets();
@@ -67,7 +68,10 @@ HSteamNetPollGroup createPoll() {
 void runServerCallbacks() {
     if (serverCallbacks) std::exchange(serverCallbacks, {})();
 }
-EResult acceptConnection(HSteamNetConnection) { return k_EResultOK; }
+EResult acceptConnection(HSteamNetConnection) { return failAccept ? k_EResultFail : k_EResultOK; }
+bool assignPollGroup(HSteamNetConnection handle, HSteamNetPollGroup group) {
+    return !failPollAssignment && SteamNetworkingSockets()->SetConnectionPollGroup(handle, group);
+}
 '''
 for name in ['network_manager', 'client', 'server']:
     path = 'network/' + name + '.cppm'
@@ -85,6 +89,7 @@ for name in ['network_manager', 'client', 'server']:
         ('m_pInterface->CreatePollGroup()', 'createPoll()'),
         ('m_pInterface->RunCallbacks()', 'runServerCallbacks()'),
         ('m_pInterface->AcceptConnection(', 'acceptConnection('),
+        ('m_pInterface->SetConnectionPollGroup(', 'assignPollGroup('),
     ]:
         code = code.replace(original, replacement)
     source += '\n' + code
@@ -217,6 +222,32 @@ int main() {
           serverReceive = 1;
           try { server.update(); check(false, "server exception lost"); } catch (int value) { check(value == 43, "server exception identity"); }
           check(liveMessages == 0 && !isNetworkInitialized(), "server exception cleanup precedes shutdown");
+        }
+        { Server server; check(server.start(45333, 1000).has_value(), "admission test start");
+          int admissions = 0, disconnections = 0;
+          server.addClientConnectedCallback([&](auto conn) {
+              ++admissions;
+              check(server.disconnectConnection(conn, false).has_value(), "disconnect during admission");
+          });
+          server.addClientConnectedCallback([&](auto) { ++admissions; });
+          server.addClientDisconnectedCallback([&](auto) { ++disconnections; });
+          for (int attempt = 0; attempt < 3; ++attempt) {
+              HSteamNetConnection a, b;
+              auto* sockets = SteamNetworkingSockets();
+              check(sockets->CreateSocketPair(&a, &b, false, nullptr, nullptr), "admission socket pair");
+              failAccept = attempt == 0;
+              failPollAssignment = attempt == 1;
+              SteamNetConnectionStatusChangedCallback_t event{};
+              event.m_hConn = a;
+              event.m_info.m_hListenSocket = server.m_hListenSocket;
+              event.m_info.m_eState = k_ESteamNetworkingConnectionState_Connecting;
+              serverCallbacks = [&] { Server::SteamNetConnectionStatusChangedCallback(&event); };
+              check(server.update().has_value(), "drive admission");
+              SteamNetConnectionInfo_t info{};
+              check(!sockets->GetConnectionInfo(a, &info), "rejected connection remained open");
+              check(admissions == (attempt == 2) && disconnections == admissions, "stale admission callbacks");
+              check(sockets->CloseConnection(b, 0, nullptr, false), "clean up admission peer");
+          }
         }
         { Server server; check(server.start(45333, 1000).has_value(), "server start");
           HSteamNetConnection a, b;
