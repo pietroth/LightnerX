@@ -113,7 +113,7 @@ Event:    (total_size << 1) | 0
 Response: (total_size << 1) | 1
 ```
 
-The interpreter retrieves the size with `base >> 1` and distinguishes `Event` from `Response` with `base & 1`. In the headers delivered to the callback, `protocol.size` already contains the decoded size, without the type bit.
+The interpreter retrieves the size with `base >> 1` and distinguishes `Event` from `Response` with `base & 1`. In the headers delivered to the callback, `protocol.size` already contains the decoded size, without the type bit. To forward a decoded Event or Response, build a new wire header using the current header and payload lengths and the appropriate type bit. Passing the decoded header directly to a converter copies the decoded length into the frame.
 
 Reception currently tolerates additional bytes in responses when the declared total matches the supplied span and the selected header is complete. For approved and failure responses, the interpreter ignores those bytes and delivers an empty payload. For denied and partially approved responses, it delivers all bytes after `UnsuccessfulResponse`, even though the recommended denied-response format has no payload. `protocol.size` still includes the complete received message, including any ignored bytes; it can therefore exceed the header size plus the delivered payload size. This reception behavior does not change the recommended emission formats. Converters copy the supplied payload without enforcing status-specific payload rules.
 
@@ -165,7 +165,7 @@ Callbacks run during the interpretation call. The header is delivered by value, 
 The usual flow is:
 
 1. Initialize the network and call `initMessagesBatcher(capacity)` before queuing the first message.
-2. Construct the header with the total message size.
+2. Add the header and payload lengths. For an Event, encode that total as `totalSize << 1`. For either Response header, use `(totalSize << 1) | 1`. For an Intention or Notification, use the total directly.
 3. Create a `lightnerx::network::Target`.
 4. Use the corresponding converter to obtain a `lightnerx::network::OutboundMessage`.
 5. Pass the object to `queueMessage(std::move(outbound))`, transferring ownership of the message and destination.
@@ -215,7 +215,7 @@ Call `broadcastEvent(connections)` for everyone or `broadcastEvent(connections, 
 
 `queueMessage` receives the `OutboundMessage` from the converter and stores the same message with its destination, without allocating another message or copying the bytes. The call consumes the message: on success, the batcher keeps it until the flush; if the queue is full, it releases it immediately. The caller must not call `Release()` or reuse the message after passing it to the queue. A null pointer is rejected with `invalid_argument`.
 
-`flushAll` iterates over pending messages, routes each one according to its destination, and releases the message received from the converter with `Release()`. All entries are processed and the queue is emptied even when send errors occur. The return value indicates success or the last error encountered among these operations.
+`flushAll` iterates over pending messages, routes each one according to its destination, and releases the message received from the converter with `Release()`. When sends return error codes, the batcher attempts every entry and returns the error from the last failed entry. A thrown exception stops further sends, releases all queued messages and propagates to the caller.
 
 Batching lets you accumulate multiple messages before a flush. Each entry remains a separate message; payloads are not concatenated. The application decides when to flush, for example at the end of an update. Success indicates that the transport accepted the send operations, without confirming processing by the recipient.
 

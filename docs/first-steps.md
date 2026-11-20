@@ -208,10 +208,10 @@ std::expected<void, std::error_code> sendEventToGroup(
     std::vector<HSteamNetConnection> receivers,
     const lightnerx::network::ConnectionManager& connections
 ) {
-    const auto totalSize = sizeof(lightnerx::communication::Event) + payload.size();
-    if (totalSize > 0x7fff) {
+    if (payload.size() > 0x7fff - sizeof(lightnerx::communication::Event)) {
         return std::unexpected(std::make_error_code(std::errc::message_size));
     }
+    const auto totalSize = sizeof(lightnerx::communication::Event) + payload.size();
 
     const lightnerx::communication::Event event{
         static_cast<std::uint16_t>(totalSize << 1),
