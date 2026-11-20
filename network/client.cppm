@@ -67,12 +67,13 @@ export namespace lightnerx::network {
                 );
             }
 
+            const bool networkWasInitialized = isNetworkInitialized();
             if (auto acquired = detail::acquireNetworkOwner(this); !acquired) return acquired;
 
             m_sockets = SteamNetworkingSockets();
 
             if (!m_sockets) {
-                detail::releaseNetworkOwner(this);
+                detail::releaseNetworkOwner(this, !networkWasInitialized);
 
                 return std::unexpected(
                     std::make_error_code(std::errc::io_error)

@@ -22,6 +22,11 @@ source = r'''
 #include <steam/isteamnetworkingutils.h>
 int liveMessages = 0, clientReceive = 0, serverReceive = 0;
 bool failListener = false, failPoll = false;
+bool failInterface = false;
+int networkCleanups = 0;
+ISteamNetworkingSockets* startupSockets() {
+    return failInterface ? nullptr : SteamNetworkingSockets();
+}
 std::function<void()> serverCallbacks;
 std::vector<SteamNetworkingMessage_t*> allocatedMessages;
 void check(bool value, const char* message) { if (!value) throw std::runtime_error(message); }
@@ -72,6 +77,8 @@ for name in ['network_manager', 'client', 'server']:
                      if not line.startswith(('module;', 'export module ', 'import ', 'export import ')))
     code = code.replace('private:', 'public:')
     for original, replacement in [
+        ('m_sockets = SteamNetworkingSockets();', 'm_sockets = startupSockets();'),
+        ('m_pInterface = SteamNetworkingSockets();', 'm_pInterface = startupSockets();'),
         ('m_sockets->ReceiveMessagesOnConnection(', 'receiveClient('),
         ('m_pInterface->ReceiveMessagesOnPollGroup(', 'receiveServer('),
         ('m_pInterface->CreateListenSocketIP(', 'createListener('),
@@ -125,8 +132,41 @@ void attachPair(Client& client) {
     client.m_connection = a;
     client.connected = true;
 }
+void checkStartupRollback() {
+    Client client;
+    Server server;
+    const auto ioError = std::unexpected(std::make_error_code(std::errc::io_error));
+    failInterface = true;
+    check(client.start() == ioError && !isNetworkInitialized(),
+          "client must roll back its own startup");
+    check(server.start(45333, 1000) == ioError && !isNetworkInitialized(),
+          "server must roll back its own startup");
+
+    check(networkInit(), "manual startup");
+    auto* sockets = SteamNetworkingSockets();
+    HSteamNetConnection a, b;
+    check(sockets->CreateSocketPair(&a, &b, false, nullptr, nullptr), "manual socket pair");
+    detail::setNetworkCleanup([]() noexcept { ++networkCleanups; });
+    check(client.start() == ioError, "client interface failure");
+    check(server.start(45333, 1000) == ioError, "server interface failure");
+    failInterface = false;
+    failListener = true;
+    check(!server.start(45333, 1000), "listener failure");
+    failListener = false;
+    failPoll = true;
+    check(!server.start(45333, 1000), "poll group failure");
+    failPoll = false;
+    check(isNetworkInitialized() && SteamNetworkingSockets() == sockets, "manual runtime lost");
+    SteamNetConnectionInfo_t info{};
+    check(sockets->GetConnectionInfo(a, &info) && networkCleanups == 0, "caller resources lost");
+    check(server.start(45333, 1000).has_value(), "retry with manual runtime");
+    server.close();
+    detail::setNetworkCleanup(nullptr);
+    check(!isNetworkInitialized() && networkCleanups == 1, "successful owner must shut down once");
+}
 int main() {
     try {
+        checkStartupRollback();
         { Client client; check(client.start().has_value(), "start"); attachPair(client);
           check(client.disconnect(false).has_value(), "disconnect");
           check(!client.isConnected() && !client.getServerHConn(), "LX-06 local reset");

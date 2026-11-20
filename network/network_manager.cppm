@@ -58,10 +58,10 @@ export namespace lightnerx::network {
             return {};
         }
 
-        void releaseNetworkOwner(const void* owner) noexcept {
+        void releaseNetworkOwner(const void* owner, bool shutdown = true) noexcept {
             if (networkOwner != owner) return;
             networkOwner = nullptr;
-            networkKill();
+            if (shutdown) networkKill();
         }
     }
 }
