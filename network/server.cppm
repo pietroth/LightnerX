@@ -69,9 +69,14 @@ export namespace lightnerx::network {
             if (port < 1 || port > 65535 || timeoutConnected > INT32_MAX) {
                 return std::unexpected(std::make_error_code(std::errc::invalid_argument));
             }
+            const bool networkWasInitialized = isNetworkInitialized();
             if (auto acquired = detail::acquireNetworkOwner(this); !acquired) return acquired;
 
             m_pInterface = SteamNetworkingSockets();
+            if (!m_pInterface) {
+                detail::releaseNetworkOwner(this, !networkWasInitialized);
+                return std::unexpected(std::make_error_code(std::errc::io_error));
+            }
             closeRequested = false;
             callbackException = nullptr;
 
@@ -100,14 +105,14 @@ export namespace lightnerx::network {
             );
 
             if (m_hListenSocket == k_invalidSocket) {
-                close();
+                closeResources(!networkWasInitialized);
                 return std::unexpected(std::make_error_code(std::errc::resource_unavailable_try_again));
             }
 
             m_hPollGroup = m_pInterface->CreatePollGroup();
 
             if (m_hPollGroup == k_invalidPollGroup) {
-                close();
+                closeResources(!networkWasInitialized);
                 return std::unexpected(std::make_error_code(std::errc::resource_unavailable_try_again));
             }
 
@@ -198,6 +203,11 @@ export namespace lightnerx::network {
                 closeRequested = true;
                 return;
             }
+            closeResources(true);
+        }
+
+    private:
+        void closeResources(bool shutdown) noexcept {
             if (m_pInterface == nullptr) {
                 return;
             }
@@ -217,7 +227,7 @@ export namespace lightnerx::network {
             closeRequested = false;
             callbackException = nullptr;
 
-            detail::releaseNetworkOwner(this);
+            detail::releaseNetworkOwner(this, shutdown);
         }
 
         private:
