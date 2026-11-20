@@ -269,6 +269,7 @@ export namespace lightnerx::network {
 
                         const auto count = clientConnectedCallbacks.size();
                         for (std::size_t i = 0; i < count && !closeRequested; ++i) {
+                            if (i != 0 && !m_pInterface->GetConnectionInfo(hConn, &info)) break;
                             clientConnectedCallbacks[i](hConn);
                         }
 
