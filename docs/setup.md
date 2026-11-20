@@ -1,10 +1,17 @@
 # Setup
 
-The `LightnerX` target builds a static library by default.
+These instructions apply to the historical `legacy/cpp26` branch. The `LightnerX` target builds a static library by default.
 
 ## GameNetworkingSockets
 
-GameNetworkingSockets is maintained as a submodule in `external/GameNetworkingSockets`. After obtaining the repository, run the following from the LightnerX root directory:
+For a fresh checkout, select the historical branch and its pinned submodules together.
+
+```bash
+git clone --branch legacy/cpp26 --recurse-submodules https://github.com/pietroth/LightnerX.git
+cd LightnerX
+```
+
+In an existing checkout of `legacy/cpp26`, initialize the pinned GameNetworkingSockets revision in `external/GameNetworkingSockets`.
 
 ```bash
 git submodule update --init --recursive
@@ -74,8 +81,9 @@ of the client and transport modules.
 
 ## Regression tests and sanitizers
 
-The regression suite also requires Python 3 for deterministic fault-injection
-tests that compile the production implementation with a small transport mock.
+The regression suite requires Python 3. It builds the complete module examples
+from the guides and exercises a separate CMake consumer. The wire-format test
+compares serialized bytes and parser output with the saved C++26 fixture.
 
 ```bash
 cmake -S . -B build/tests -G Ninja -DCMAKE_BUILD_TYPE=Debug -DLIGHTNERX_BUILD_TESTS=ON
