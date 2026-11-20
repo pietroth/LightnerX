@@ -134,7 +134,11 @@ for index, namespace in [(13, 'communication'), (14, 'network'), (20, 'network')
     checks = ''
     for name in re.findall(r'(\w+)\s*\(', code):
         if name == 'queueMessage':
-            checks += 'static_assert(static_cast<decltype(&declared::queueMessage)>(&lightnerx::network::queueMessage) != nullptr);\n'
+            # Resolve the overload without evaluating its address under sanitizers.
+            checks += (
+                'using QueueMessage = decltype(static_cast<decltype(&declared::queueMessage)>'
+                '(&lightnerx::network::queueMessage));\n'
+            )
         else:
             checks += 'static_assert(std::is_same_v<decltype(&declared::' + name + '), decltype(&lightnerx::' + namespace + '::' + name + ')>);\n'
     emit('api_' + str(index), headers + using + 'namespace api_' + str(index) + ' { namespace declared {\n' + code + '}\n' + checks + '}\n')
