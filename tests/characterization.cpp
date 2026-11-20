@@ -65,7 +65,15 @@ std::vector<std::byte> wire(const char* name, n::OutboundMessage outbound) {
 }
 
 void error(const char* name, std::expected<void, std::error_code> result) {
-    std::cout << name << '=' << (result ? 0 : result.error().value()) << '\n';
+    const char* label = "success";
+    if (!result) {
+        const auto code = result.error();
+        if (code == std::errc::not_connected) label = "not_connected";
+        else if (code == std::errc::invalid_argument) label = "invalid_argument";
+        else if (code == std::errc::resource_unavailable_try_again) label = "resource_unavailable_try_again";
+        else throw std::system_error(code, name);
+    }
+    std::cout << name << '=' << label << '\n';
 }
 }
 
