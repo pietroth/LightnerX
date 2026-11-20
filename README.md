@@ -1,6 +1,12 @@
+# LightnerX · historical C++26 branch
+
 ![LightnerX](docs/LightnerX%20Framed%20Wordmark.png)
 
-LightnerX is a modular C++ library for building applications that communicate using the INER semantic protocol. The CMake project provides the `LightnerX` target; it neither produces nor requires its own executable. The library provides types for representing messages, interpreters, callbacks, connection management, and a transport layer based on GameNetworkingSockets.
+`legacy/cpp26` preserves the native modules and `import std` API from before the C++17 migration. Maintenance is limited to selected fixes. Backports are discretionary, with no commitment to track changes on `main`. Active development continues on [main](https://github.com/pietroth/LightnerX/tree/main).
+
+LightnerX provides client-server networking over GameNetworkingSockets and the types, interpreters and callbacks for exchanging INER messages. The CMake target is `LightnerX`. This branch uses `std::span<const std::byte>` for byte views and `std::expected<void, std::error_code>` for network results.
+
+The historical base is `1eca29b`, which includes the original wire-format regression fixture. For the tested toolchain, build commands and fixes carried over from C++17, see the [setup guide](docs/setup.md) and [backport review](docs/audit-fixes.md#backports).
 
 INER defines the meaning of messages exchanged between an Authority and an Obedient. It does not define sockets, connections, or an execution model. These capabilities are provided by LightnerX's networking components and can be connected to the application according to the developer's needs.
 

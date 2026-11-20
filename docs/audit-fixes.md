@@ -1,5 +1,23 @@
 # Correções da auditoria LightnerX
 
+## Backports
+
+A branch histórica parte de `1eca29b`, que ainda contém os 14 módulos nativos e registra o comportamento de `541ae1d`. A revisão das mudanças posteriores à migração para C++17 abrange a `main` até `c7d0a48`. O submódulo GameNetworkingSockets continua em `d534c19`.
+
+| Origem na `main` | Comportamento verificado em C++26 | Regressão |
+| --- | --- | --- |
+| `835b8cc`, `12f8401` | Importadores distintos veem as mesmas constantes, o mesmo estado de rede e a fila reservada antes de `main()`. | `consumer` |
+| `9f05400`, `12f8401`, `557539a` | O transporte rejeita tamanhos acima de `UINT32_MAX`. Grupos e broadcast preservam a ordem dos erros. O flush libera as mensagens pendentes. | `transport_faults`, `message_faults` |
+| `cfe4d19` | O destino recebe os registros e IDs livres. O manager de origem volta a aceitar registros até sua capacidade original. | `connection_manager_assignment` |
+| `28ca8e6`, `6455659` | Uma falha em `start()` preserva a rede inicializada pelo chamador. Desconectar durante a admissão interrompe os callbacks restantes para aquele cliente. O cliente valida o literal IP inteiro. | `lifecycle_faults`, `lifecycle` |
+| `a22df8e`, `206bbca` | Plugins que usam a mesma biblioteca compartilhada respeitam um único proprietário da rede, inclusive com GNS estático. | `shared_runtime`, `consumer` |
+| `9587ebb` | Os conversores verificam os limites de alocação e a disponibilidade do alocador. A API histórica mantém suas exceções e a transferência de posse ao enfileirar. | `messages`, `message_faults` |
+| `47403ca`, `88f1735`, `7767d37` | Os testes inicializam as mensagens simuladas, comparam condições de erro portáveis e repetem a seleção da porta UDP somente após confirmar uma colisão. | `characterization`, `integration` |
+
+As mudanças nos substitutos de `span` e `expected`, nos cabeçalhos públicos e no tipo `Result` atendiam à API C++17. Aqui, os consumidores importam os módulos e usam os tipos da biblioteca padrão. A fixture original continua sendo a referência para o protocolo INER. Os testes opcionais `reference_server` e `reference_client` também comparam as duas implementações pela rede. [Instruções de validação](setup.md#regression-tests-and-sanitizers)
+
+## Auditoria original
+
 Revisão de origem: `8e5a352`. Dependência GNS: `d534c19`. Auditoria lida:
 `LightnerX-audit.md`. Trabalho validado em 12/11/2026 com GCC/libstdc++ 15.2,
 CMake 4.2.3 e Ninja 1.13.2, em Linux.
