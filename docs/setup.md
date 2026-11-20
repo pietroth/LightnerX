@@ -72,6 +72,11 @@ cmake --build build/tests --parallel 2
 ctest --test-dir build/tests --output-on-failure
 ```
 
+To check UDP interoperability with another LightnerX revision, build its
+`lightnerx_test_lifecycle` executable separately. Configure this branch with
+`-DLIGHTNERX_REFERENCE_BINARY=/absolute/path/to/lightnerx_test_lifecycle`.
+CTest then runs each version as the client and as the server against the other.
+
 With the tested GCC 15.2 toolchain, instrument the modules with AddressSanitizer:
 
 ```bash
