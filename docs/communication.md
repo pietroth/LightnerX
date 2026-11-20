@@ -233,7 +233,7 @@ Call `broadcastEvent(connections)` for everyone or `broadcastEvent(connections, 
 
 `queueMessage` transfers ownership into the batcher without copying the bytes again. It propagates a converter error before queuing. A full queue releases the message immediately. A moved-from message is rejected with `ErrorCode::InvalidArgument`.
 
-`flushAll` iterates over pending messages, routes each one according to its destination, and releases the message received from the converter with `Release()`. All entries are processed and the queue is emptied even when send errors occur. The return value indicates success or the last error encountered among these operations.
+`flushAll` sends the queued messages and releases their buffers. When sends return errors, flushing still attempts all entries, empties the queue, and returns the error from the last failed entry. See the [batcher reference](api.md#batcher) for error and exception behavior.
 
 Batching lets you accumulate multiple messages before a flush. Each entry remains a separate message; payloads are not concatenated. The application decides when to flush, for example at the end of an update. Success indicates that the transport accepted the send operations, without confirming processing by the recipient.
 

@@ -133,14 +133,15 @@ for index, namespace in [(13, 'communication'), (14, 'network'), (20, 'network')
     code = take('api.md', index)
     checks = ''
     for name in re.findall(r'(\w+)\s*\(', code):
-        if name == 'queueMessage':
-            # Resolve the overload without evaluating its address under sanitizers.
-            checks += (
-                'using QueueMessage = decltype(static_cast<decltype(&declared::queueMessage)>'
-                '(&lightnerx::network::queueMessage));\n'
-            )
-        else:
+        if name != 'queueMessage':
             checks += 'static_assert(std::is_same_v<decltype(&declared::' + name + '), decltype(&lightnerx::' + namespace + '::' + name + ')>);\n'
+    for overload, declaration in enumerate(re.findall(r'^[^\n]+\bqueueMessage\([^;]+\);', code, re.M)):
+        # Look up each documented signature in its own namespace without evaluating the address.
+        checks += (
+            f'namespace queue_message_{overload} {{\n{declaration}\n'
+            'using Checked = decltype(static_cast<decltype(&queueMessage)>'
+            '(&lightnerx::network::queueMessage));\n}\n'
+        )
     emit('api_' + str(index), headers + using + 'namespace api_' + str(index) + ' { namespace declared {\n' + code + '}\n' + checks + '}\n')
 for index, actual, fields in [(9, 'Message', ['header', 'payload']), (25, 'Target', ['connection', 'broadcastExceptions'])]:
     code = take('api.md', index)
