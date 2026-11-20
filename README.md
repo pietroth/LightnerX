@@ -1,19 +1,20 @@
 ![LightnerX](docs/LightnerX%20Framed%20Wordmark.png)
 
-LightnerX is a C++17 library for building applications that communicate using the INER semantic protocol. The CMake project provides the `LightnerX` target; it neither produces nor requires its own executable. The library provides types for representing messages, interpreters, callbacks, connection management, and a transport layer based on GameNetworkingSockets.
+LightnerX is a C++17 library that abstracts client-server networking behind a simple API. It lets applications open and close servers, manage client connections, and exchange messages without calling GameNetworkingSockets directly. It also provides the in-memory message structures and interpreters needed to use the INER semantic protocol.
+
+## Features
+
+- Start and close servers with `Server::start()` and `Server::close()`, and disconnect individual clients with `Server::disconnectConnection()`.
+- Initialize clients with `Client::start()`, connect with `Client::connect()`, and disconnect with `Client::disconnect()`. Destroying the client releases its networking resources.
+- Send and receive all four INER message types. Clients send `Intention` and `Notification` messages. Servers send `Event` and `Response` messages.
+- Prepare outgoing messages by combining an INER header and payload into a send buffer with converters such as `event2OutboundMessage()`.
+- Decode incoming bytes with `MessageInterpreter` and deliver structured messages to application callbacks.
 
 ## Why LightnerX?
 
-LightnerX keeps client-server communication simple through a clear message model and modular components:
+LightnerX keeps networking simple in applications built around an authoritative server. Its modular components let the application decide how to connect networking, connection management, and message handling. INER defines what each message means and which side sends it, giving the server and its clients a shared communication model.
 
-- **Simple integration:** connect networking and message handling through callbacks, while keeping control over initialization, update timing, and threads.
-- **Standardized communication:** INER gives client and server a shared vocabulary for action requests, results, events, and informational updates, making each message's purpose and direction explicit.
-- **Modularity:** compose message interpreters, connection management, and transport components according to your application's needs.
-- **Application flexibility:** define your own message types and payloads while following the same communication model.
-
-INER defines the meaning of messages exchanged between an Authority and an Obedient. It does not define sockets, connections, or an execution model. These capabilities are provided by LightnerX's networking components and can be connected to the application according to the developer's needs.
-
-Build with CMake 3.22 or newer and a C++17 compiler. Public headers live under `include/lightnerx/`. Byte views use `std::string_view` and results use `lightnerx::Result`. See [Setup](docs/setup.md) for dependencies and tested toolchains.
+Build with CMake 3.22 or newer and a C++17 compiler. The CMake project provides the `LightnerX` library target without producing or requiring a standalone executable. Public headers live under `include/lightnerx/`. Byte views use `std::string_view` and results use `lightnerx::Result`. See [Setup](docs/setup.md) for dependencies and tested toolchains.
 
 ## Library, not a framework
 
