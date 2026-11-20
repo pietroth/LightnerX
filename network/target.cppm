@@ -16,6 +16,11 @@ export namespace lightnerx::network {
             : connection(std::move(conn)), broadcastExceptions(std::move(exceptions)) {}
 
         public:
+        Target(const Target&);
+        Target(Target&&) noexcept;
+        Target& operator=(const Target&);
+        Target& operator=(Target&&) noexcept;
+
         static Target single(HSteamNetConnection conn) {
             return Target(conn);
         }
@@ -40,4 +45,10 @@ export namespace lightnerx::network {
             return std::holds_alternative<HSteamNetConnection>(connection);
         }
     };
+
+    // Provide definitions in the library even when all its own calls are inlined.
+    Target::Target(const Target&) = default;
+    Target::Target(Target&&) noexcept = default;
+    Target& Target::operator=(const Target&) = default;
+    Target& Target::operator=(Target&&) noexcept = default;
 }

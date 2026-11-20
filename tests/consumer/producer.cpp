@@ -32,6 +32,12 @@ const void* producerStateAddress() {
 bool queueFromProducer() {
     namespace network = lightnerx::network;
     namespace communication = lightnerx::communication;
-    return bool(network::queueMessage(communication::event2OutboundMessage(
-        communication::Event(8, 12), {}, network::Target::single(network::k_invalidConnection))));
+    auto destination = network::Target::group({network::k_invalidConnection});
+    auto copy = destination;
+    auto moved = std::move(copy);
+    copy = destination;
+    destination = std::move(moved);
+    if (!copy.isGroup() || destination.connection != copy.connection) return false;
+    auto message = communication::event2OutboundMessage(communication::Event(8, 12), {}, destination);
+    return bool(network::queueMessage(std::move(message)));
 }
