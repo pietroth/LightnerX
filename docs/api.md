@@ -405,6 +405,8 @@ std::expected<void, std::error_code> sendToConnection(
 
 Forwards the bytes to GameNetworkingSockets with the reliable send option. The return value indicates whether the transport accepted the send. This function uses the transport directly, bypassing the batcher queue.
 
+For a valid connection, lengths above `UINT32_MAX` return `std::errc::message_size` before the call to GameNetworkingSockets. Smaller lengths are still subject to the transport's own send limits.
+
 ### Sending to a group
 
 ```cpp

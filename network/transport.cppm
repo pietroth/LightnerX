@@ -28,10 +28,15 @@ export namespace lightnerx::network {
             );
         }
 
+        const auto messageSize = message.size();
+        if (messageSize > std::numeric_limits<std::uint32_t>::max()) {
+            return std::unexpected(std::make_error_code(std::errc::message_size));
+        }
+
         EResult result = pInterface->SendMessageToConnection(
             hConn,
             message.data(),
-            static_cast<uint32_t>(message.size()),
+            static_cast<std::uint32_t>(messageSize),
             k_nSteamNetworkingSend_Reliable,
             nullptr
         );
@@ -73,7 +78,7 @@ export namespace lightnerx::network {
     ) {
         std::optional<std::error_code> error;
 
-        connectionManager.forEach([&](uint16_t id, HSteamNetConnection hConn) {
+        connectionManager.forEach([&](uint16_t, HSteamNetConnection hConn) {
             if (std::ranges::contains(exceptions, hConn)) {
                 return ;
             }

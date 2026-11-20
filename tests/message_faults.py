@@ -8,16 +8,12 @@ import argparse
 import pathlib
 import subprocess
 import tempfile
+from module_source import ROOT, implementation
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--compiler', default='g++')
 parser.add_argument('--sanitize', action='store_true')
 args = parser.parse_args()
-root = pathlib.Path(__file__).resolve().parent.parent
-
-def body(path):
-    return '\n'.join(line.replace('export ', '') for line in (root / path).read_text().splitlines()
-                     if not line.startswith(('module;', 'export module ', 'import ', 'export import ')))
 
 source = r'''
 #define LIGHTNERX_SOURCE_TEST
@@ -72,14 +68,14 @@ for path in ['communication/base_protocol.cppm', 'communication/mbt.cppm',
              'communication/intention.cppm', 'communication/notification.cppm',
              'communication/event.cppm', 'communication/response.cppm',
              'network/target.cppm', 'network/message_batch.cppm', 'communication/message.cppm']:
-    source += '\n' + body(path).replace('SteamNetworkingUtils()', 'injectedUtils()')
-source += '\n' + (root / 'tests/messages.cpp').read_text()
+    source += '\n' + implementation((ROOT / path).read_text()).replace('SteamNetworkingUtils()', 'injectedUtils()')
+source += '\n' + (ROOT / 'tests/messages.cpp').read_text()
 with tempfile.TemporaryDirectory(prefix='lightnerx-message-test-') as directory:
     cpp = pathlib.Path(directory) / 'messages.cpp'
     binary = pathlib.Path(directory) / 'messages'
     cpp.write_text(source)
     command = [args.compiler, '-std=c++26', '-g', '-O1',
-               '-I' + str(root / 'external/GameNetworkingSockets/include'), str(cpp), '-o', str(binary)]
+               '-I' + str(ROOT / 'external/GameNetworkingSockets/include'), str(cpp), '-o', str(binary)]
     if args.sanitize:
         command += ['-fsanitize=address,undefined', '-fno-omit-frame-pointer', '-fno-sanitize-recover=all']
     subprocess.run(command, check=True)

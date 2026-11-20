@@ -42,6 +42,12 @@ add_test(NAME lightnerx.message_faults
 )
 set_tests_properties(lightnerx.message_faults PROPERTIES TIMEOUT 180)
 
+add_test(NAME lightnerx.transport_faults
+    COMMAND ${Python3_EXECUTABLE} "${CMAKE_CURRENT_SOURCE_DIR}/transport_faults.py"
+        --compiler "${CMAKE_CXX_COMPILER}" "--flags=${CMAKE_CXX_FLAGS}" ${message_fault_options}
+)
+set_tests_properties(lightnerx.transport_faults PROPERTIES TIMEOUT 180)
+
 add_test(NAME lightnerx.lifecycle_faults
     COMMAND ${Python3_EXECUTABLE} "${CMAKE_CURRENT_SOURCE_DIR}/lifecycle_faults.py"
         --compiler "${CMAKE_CXX_COMPILER}" --library "$<TARGET_FILE:GameNetworkingSockets>"
