@@ -27,7 +27,9 @@ bool failAllocation = false, throwSend = false;
 int liveMessages = 0;
 int sendsBeforeThrow = 0;
 void (*cleanupHook)() noexcept = nullptr;
-struct TestMessage : SteamNetworkingMessage_t {};
+struct TestMessage : SteamNetworkingMessage_t {
+    TestMessage() : SteamNetworkingMessage_t{} {}
+};
 struct TestUtils {
     SteamNetworkingMessage_t* AllocateMessage(int size) {
         if (failAllocation) return nullptr;

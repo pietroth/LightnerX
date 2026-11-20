@@ -25,7 +25,9 @@ bool failListener = false, failPoll = false;
 std::function<void()> serverCallbacks;
 std::vector<SteamNetworkingMessage_t*> allocatedMessages;
 void check(bool value, const char* message) { if (!value) throw std::runtime_error(message); }
-struct TrackedMessage : SteamNetworkingMessage_t {};
+struct TrackedMessage : SteamNetworkingMessage_t {
+    TrackedMessage() : SteamNetworkingMessage_t{} {}
+};
 SteamNetworkingMessage_t* trackedMessage(HSteamNetConnection handle) {
     auto* message = new TrackedMessage{};
     message->m_pData = new std::byte[1]{std::byte{0x61}};
