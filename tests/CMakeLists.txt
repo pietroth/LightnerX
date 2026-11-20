@@ -133,3 +133,20 @@ set_tests_properties(lightnerx.consumer PROPERTIES
     TIMEOUT 600
     ENVIRONMENT "CMAKE_BUILD_PARALLEL_LEVEL=2"
 )
+
+set(example_pages
+    "${PROJECT_SOURCE_DIR}/README.md"
+    "${PROJECT_SOURCE_DIR}/docs/first-steps.md"
+    "${PROJECT_SOURCE_DIR}/docs/communication.md"
+    "${PROJECT_SOURCE_DIR}/docs/setup.md")
+set(example_script "${CMAKE_CURRENT_SOURCE_DIR}/documentation.py")
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS ${example_pages} "${example_script}")
+execute_process(COMMAND "${Python3_EXECUTABLE}" "${example_script}"
+    "${CMAKE_CURRENT_BINARY_DIR}/examples" ${example_pages}
+    COMMAND_ERROR_IS_FATAL ANY OUTPUT_VARIABLE examples OUTPUT_STRIP_TRAILING_WHITESPACE)
+foreach(source IN LISTS examples)
+    get_filename_component(name "${source}" NAME_WE)
+    add_executable(lightnerx_doc_${name} "${source}")
+    target_link_libraries(lightnerx_doc_${name} PRIVATE LightnerX)
+endforeach()
+add_test(NAME lightnerx.documentation_setup COMMAND lightnerx_doc_setup_1)
