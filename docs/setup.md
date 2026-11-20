@@ -71,7 +71,7 @@ int main() {
 
 Use ordinary headers and sources with compatible compiler and standard-library ABIs. Each former module has a corresponding header, for example `<lightnerx/network/server.hpp>`, with definitions in `network/server.cpp`. The independent `tests/consumer` project checks propagated requirements and shared network/queue state across translation units. All public headers also compile in isolation.
 
-Byte views use `std::string_view` from `<string_view>`. Results use `lightnerx::Result` from `<lightnerx/Result.hpp>`. Consumers can compile with `-fno-exceptions`. See [C++17 byte views and results](cpp17-types.md) for examples.
+Byte views use `std::string_view` from `<string_view>`. Results use `lightnerx::Result` from `<lightnerx/Result.hpp>`. Consumer code can compile with `-fno-exceptions`. Library operations that allocate may still propagate exceptions, such as `std::bad_alloc` when reserving the batcher. See [C++17 byte views and results](cpp17-types.md) and the [batcher reference](api.md#batcher).
 
 For a host application that loads multiple plugins, configure with `-DLIGHTNERX_BUILD_SHARED=ON` and link each plugin to the same `LightnerX` target from the host build. Ship one shared library instance with the application. Static linking is supported for consumers that link LightnerX once into the process. Separate static copies embedded in plugins have separate state and can interfere with the same GNS runtime.
 

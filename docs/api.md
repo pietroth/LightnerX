@@ -242,7 +242,7 @@ lightnerx::Result<lightnerx::network::OutboundMessage> notification2OutboundMess
 );
 ```
 
-The converters copy the header and payload into an owning `OutboundMessage`. They return `ErrorCode::NotEnoughMemory` for a failed transport allocation and `ErrorCode::MessageSize` if the byte count exceeds the allocation limit.
+The converters copy the header and payload into an owning `OutboundMessage` and store `target` as the destination. They return `ErrorCode::NotEnoughMemory` for a failed transport allocation, `ErrorCode::MessageSize` if the combined byte count exceeds `INT_MAX` (the allocator's size limit), or `ErrorCode::IoError` if the transport utilities are unavailable.
 
 Initialize the network before using them. Fill in the `size` field according to the [binary representation](communication.md#binary-representation), then pass the result to `queueMessage`. For approved, denied, or failure responses, provide `{}` as the payload. For partial approval, provide the bytes defined by the application.
 
@@ -501,6 +501,8 @@ static lightnerx::Result<OutboundMessage> create(
 std::string_view data() const noexcept;
 ```
 
+`create(header, payload, target)` copies the two byte views in order and stores the destination by value. Initialize the network before calling it. It returns the same allocation errors as the outbound converters. `data()` borrows the resulting bytes while the object retains its buffer and returns an empty view for an empty buffer or a moved-from message.
+
 ### Batcher
 
 ```cpp
@@ -508,19 +510,20 @@ lightnerx::Result<void> initMessagesBatcher(int capacity);
 void clearMessagesBatcher() noexcept;
 
 lightnerx::Result<void> queueMessage(OutboundMessage message);
+lightnerx::Result<void> queueMessage(lightnerx::Result<OutboundMessage> message);
 
 lightnerx::Result<void> flushAll(
     const ConnectionManager& connectionManager
 );
 ```
 
-`initMessagesBatcher` reserves space in the batcher's shared queue. Call it before queuing with the number of messages you want to be able to keep pending. The first access constructs the queue, including when a consumer reserves capacity before `main()`. Reserving preserves pending messages. A negative capacity returns `ErrorCode::InvalidArgument`.
+`initMessagesBatcher(capacity)` ensures room for at least `capacity` pending messages in the shared queue. Capacity counts messages. Reserving preserves the current messages and never reduces the reserved capacity. The first access constructs the queue, including when a consumer reserves capacity before `main()`. A negative value returns `ErrorCode::InvalidArgument`. A value above the queue's maximum representable size returns `ErrorCode::NotEnoughMemory`. If allocating the requested storage fails, `std::bad_alloc` can propagate before the function returns a result.
 
-`queueMessage` moves the message into the queue without copying its bytes. A full queue releases the message and returns `ErrorCode::NotEnoughMemory`. A moved-from message returns `ErrorCode::InvalidArgument`.
+`queueMessage(OutboundMessage)` consumes the message and moves it into the queue without copying its bytes. A full queue releases the message and returns `ErrorCode::NotEnoughMemory`. A moved-from message returns `ErrorCode::InvalidArgument`. The overload taking `Result<OutboundMessage>` propagates the converter's error or consumes and queues the contained message.
 
-`flushAll` processes each message separately by sending it to an individual connection, a group, or a broadcast. `ConnectionManager` is a required argument and provides the broadcast recipients. The function releases all internal messages and empties the queue even when errors occur, returning the last error among the send operations. An empty queue returns success.
+`flushAll` processes pending messages in queue order. Each message is sent to its individual connection, group, or broadcast recipients. The required `connectionManager` provides broadcast recipients at flush time. With returned send errors, flushing still attempts every entry and returns the error from the last failed entry. Within a group or broadcast entry, the first recipient error represents that entry. If preparing a send throws, for example while copying a destination vector, the exception propagates and pending messages are released during unwinding. An empty queue returns success. After any flush, the queue is empty and its reserved capacity is preserved.
 
-`OutboundMessage` has move-only ownership and releases its buffer on destruction. `data()` exposes the message bytes while the object owns them. Pass an existing object with `std::move(outbound)` or pass the converter's result to `queueMessage`, which propagates a conversion error before trying to queue the message.
+`OutboundMessage` has move-only ownership and releases its buffer on destruction. Pass a named message or converter result with `std::move(outbound)`, or pass the converter's result directly to `queueMessage`.
 
 With the network and batcher initialized, and `event`, `payload`, `connection`, and `connections` defined by the application, typical usage after a converter is:
 
@@ -552,4 +555,4 @@ Recursive `update()` returns `ErrorCode::OperationInProgress`. Callbacks may dis
 
 `ConnectionManager` owns an independent, bidirectional mapping and leaves GNS userdata available to the application. Different managers may independently register the same valid handle. IDs range from 1 to 65535 and are recycled. `forEach` visits the index range present on entry in ascending ID order. It safely allows addition and removal during iteration and may observe replacements within the original range. An exception from the callback stops the traversal and propagates to the caller.
 
-The batch queue is global. `initMessagesBatcher()` reserves capacity without discarding queued messages. `clearMessagesBatcher()` releases pending messages and preserves capacity; actual network shutdown and queue destruction also release pending messages. `flushAll()` attempts all entries, releases the queue, and returns the last error. Serialize all batch operations, including clearing and shutdown.
+The batch queue is global. `clearMessagesBatcher()` releases pending messages and preserves capacity. Actual network shutdown and queue destruction also release pending messages. Serialize all batch operations, including clearing and shutdown.

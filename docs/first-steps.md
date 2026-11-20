@@ -187,6 +187,8 @@ if (const auto reserved = lightnerx::network::initMessagesBatcher(64); !reserved
 }
 ```
 
+If a reservation fails during allocation, `std::bad_alloc` can propagate before the result check. See the [batcher reference](api.md#batcher).
+
 The destination is defined by `lightnerx::network::Target`. The following function creates an `Event`, routes it to a group, and sends the queue. It assumes the initialization above and returns the result of queuing or flushing to the caller. The same flow applies to the other message converters.
 
 ```cpp
