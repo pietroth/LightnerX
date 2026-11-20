@@ -181,6 +181,17 @@ int main() {
             lightnerx::communication::detail::allocateMessage(sizeof(Event), std::numeric_limits<std::size_t>::max());
         } catch (const std::length_error&) { caught = true; }
         require(caught, "allocation size overflow was not rejected");
+        caught = false;
+        try {
+            lightnerx::communication::detail::allocateMessage(std::numeric_limits<std::size_t>::max(), 1);
+        } catch (const std::length_error&) { caught = true; }
+        require(caught, "oversized header was not rejected");
+        missingUtils = true;
+        caught = false;
+        try { event2OutboundMessage(Event(8, 10), {}, target); }
+        catch (const std::bad_alloc&) { caught = true; }
+        require(caught && liveMessages == 0, "missing transport allocator was not reported");
+        missingUtils = false;
         failAllocation = true;
         int badAllocCount = 0;
         const std::array<std::function<OutboundMessage()>, 5> converters{

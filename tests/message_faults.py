@@ -19,7 +19,7 @@ source = r'''
 #define LIGHTNERX_SOURCE_TEST
 #include <bits/stdc++.h>
 #include <steam/isteamnetworkingutils.h>
-bool failAllocation = false, throwSend = false;
+bool failAllocation = false, missingUtils = false, throwSend = false;
 int liveMessages = 0;
 int sendsBeforeThrow = 0;
 void (*cleanupHook)() noexcept = nullptr;
@@ -41,7 +41,7 @@ struct TestUtils {
         return message;
     }
 };
-TestUtils* injectedUtils() { static TestUtils utils; return &utils; }
+TestUtils* injectedUtils() { static TestUtils utils; return missingUtils ? nullptr : &utils; }
 namespace lightnerx::network {
     struct ConnectionManager {
         ConnectionManager(int, int) {}
