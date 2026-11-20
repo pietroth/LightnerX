@@ -124,6 +124,27 @@ void assignmentRegression(std::span<const HSteamNetConnection> handles) {
     check(completed && failures > 0, "allocation failure sweep did not complete");
     std::println("ConnectionManager assignment passed: {} allocation failures preserved state", failures);
 }
+
+void moveRegression(std::span<const HSteamNetConnection> handles) {
+    ConnectionManager source(0, 2);
+    check(source.add(handles[0]) == 1 && source.add(handles[1]) == 2, "move setup");
+    source.remove(1);
+    ConnectionManager destination(std::move(source));
+    verifyMappings(source, handles, {});
+    verifyMappings(destination, handles, {{2, handles[1]}});
+    check(source.add(handles[2]) == 1, "move construction must reset ID allocation");
+    check(destination.add(handles[3]) == 1, "move construction must transfer free IDs");
+
+    source = std::move(destination);
+    verifyMappings(source, handles, {{1, handles[3]}, {2, handles[1]}});
+    verifyMappings(destination, handles, {});
+    check(destination.add(handles[4]) == 1 && destination.add(handles[5]) == 2,
+          "move assignment must preserve reusable source capacity");
+    check(!destination.add(handles[6]), "moved-from capacity must still be enforced");
+    auto& self = source;
+    source = std::move(self);
+    verifyMappings(source, handles, {{1, handles[3]}, {2, handles[1]}});
+}
 }
 
 int main() {
@@ -136,6 +157,7 @@ int main() {
                   "socket pair creation");
         }
         assignmentRegression(handles);
+        moveRegression(handles);
         for (const auto handle : handles) {
             check(SteamNetworkingSockets()->CloseConnection(handle, 0, nullptr, false), "connection cleanup");
         }

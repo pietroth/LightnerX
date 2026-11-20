@@ -376,6 +376,8 @@ void forEach(const auto& callback) const;
 
 Copying a manager produces independent registrations. Copy assignment provides the strong exception guarantee: if copying throws, the destination's mappings, count, capacity and ID allocation state remain unchanged.
 
+Moving transfers registrations and recycled IDs. The source becomes empty, keeps its maximum capacity and starts assigning IDs at 1 again.
+
 `getHSteamNetConnection` looks up a handle by its internal ID and returns `0` when there is no handle at that position. `getClientId` looks up the ID in this manager's local registration map, independently of GNS userdata or whether the handle has since closed. `getOnlineCount` returns the number of active registrations.
 
 `forEach` calls the callback for each active registration, providing the ID and handle:

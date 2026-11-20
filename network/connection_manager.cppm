@@ -17,7 +17,7 @@ export namespace lightnerx::network {
         std::vector<HSteamNetConnection> clients;
         std::unordered_map<HSteamNetConnection, uint16_t> clientIds;
         int maxCapacity;
-        int onlineCount;
+        int onlineCount = 0;
 
         std::set<uint16_t> freeIds;
         uint32_t nextId = 1;
@@ -30,12 +30,30 @@ export namespace lightnerx::network {
             }
             this->maxCapacity = std::min(maxCapacity, static_cast<int>(maxId));
             clients.reserve(std::min(initialReserve, this->maxCapacity) + 1);
-            onlineCount = 0;
         }
 
         ConnectionManager(const ConnectionManager&) = default;
-        ConnectionManager(ConnectionManager&&) = default;
-        ConnectionManager& operator=(ConnectionManager&&) = default;
+        ConnectionManager(ConnectionManager&& other) noexcept(
+            std::is_nothrow_default_constructible_v<decltype(clients)> &&
+            std::is_nothrow_default_constructible_v<decltype(clientIds)> &&
+            std::is_nothrow_default_constructible_v<decltype(freeIds)>) {
+            *this = std::move(other);
+        }
+
+        ConnectionManager& operator=(ConnectionManager&& other) noexcept {
+            if (this != &other) {
+                clients = std::move(other.clients);
+                clientIds = std::move(other.clientIds);
+                freeIds = std::move(other.freeIds);
+                maxCapacity = other.maxCapacity;
+                onlineCount = std::exchange(other.onlineCount, 0);
+                nextId = std::exchange(other.nextId, 1);
+                other.clients.clear();
+                other.clientIds.clear();
+                other.freeIds.clear();
+            }
+            return *this;
+        }
 
         ConnectionManager& operator=(const ConnectionManager& other) {
             if (this != &other) {

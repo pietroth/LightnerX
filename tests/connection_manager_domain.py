@@ -26,7 +26,9 @@ preamble = r'''
 #include <optional>
 #include <set>
 #include <stdexcept>
+#include <type_traits>
 #include <unordered_map>
+#include <utility>
 #include <vector>
 using HSteamNetConnection = uint32_t;
 using int64 = int64_t;
