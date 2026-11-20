@@ -18,7 +18,7 @@ CMake 3.22 or newer and the public `cxx_std_17` requirement replace the experime
 
 - Packed header sizes remain Event 4, Notification 4, Intention 6, Response 5 and UnsuccessfulResponse 7 bytes. Native-endian fields and authority size/type encoding remain unchanged.
 - Parsing still requires one complete frame, rejects truncation and unknown statuses, and preserves the existing extra-byte handling for approved, failure, denied and partially approved responses.
-- Group and broadcast sends attempt every selected destination and return the first error. Queue flush attempts all entries, releases messages and returns the last error. Queuing consumes ownership even when rejected.
+- Group and broadcast sends attempt every selected destination and return the first send error. On returned send errors, queue flush attempts every entry and returns the error from the last failed entry. Queuing consumes ownership even when rejected. See the [batcher reference](api.md#batcher) for exception behavior.
 - Client and Server remain noncopyable and nonmovable. One wrapper owns networking per LightnerX library instance. Multiple plugins use the same instance when they link to the [shared library](setup.md#consuming-with-cmake).
 - Connection IDs remain 1–65535 with independent mappings, recycling, strong copy assignment and bounded mutation during iteration.
 
@@ -26,7 +26,7 @@ CMake 3.22 or newer and the public `cxx_std_17` requirement replace the experime
 
 The original C++26 revision was built separately with GCC/libstdc++ 15.2.0, CMake 4.2.3, Ninja 1.13.2, Protobuf 3.21.12 and OpenSSL 3.6.5. Its nine original tests passed without skips. CMake 4.2.3 is required only to reproduce that revision's experimental standard-library module configuration.
 
-[Fixture provenance](../tests/fixtures/reference.json) records the platform, revision and toolchain. [The captured fixture](../tests/fixtures/cpp26-behavior.txt) includes error codes, serialized bytes and a deterministic parsing corpus with seed `0x4c58`: 13,275 invocations, 1,897 delivered messages and digest `14252850176607638377`. The C++17 executable must reproduce the entire output byte for byte. Runtime handles, addresses, ephemeral ports, timings and localized error strings are excluded. The fixture was recorded on Linux x86_64 with little-endian fields; it is not a claim of cross-endian wire compatibility.
+The fixture records error codes, serialized bytes and a deterministic parsing corpus with seed `0x4c58`, covering 13,275 invocations and 1,897 delivered messages with digest `14252850176607638377`. On little-endian hosts the test compares the full output byte for byte. On big-endian hosts it checks the symbolic error results and parser call count. Runtime handles, addresses, ephemeral ports, timings and localized error strings are excluded. See the [captured fixture](../tests/fixtures/cpp26-behavior.txt) and its [platform, revision and toolchain](../tests/fixtures/reference.json).
 
 The protocol fixture and UDP tests validate LightnerX behavior across the migration. The cross-version UDP tests pair the original server with the new client and the original client with the new server. Upstream projects maintain the tests for their own type implementations.
 
