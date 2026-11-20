@@ -84,9 +84,11 @@ int main() {
             std::println("Update failed: {}", updated.error().message());
             break;
         }
+        std::this_thread::sleep_for(std::chrono::milliseconds{1});
     }
 
     server.close();
+    return 1;
 }
 ```
 
@@ -149,16 +151,28 @@ int main() {
         return 1;
     }
 
+    const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds{5};
+    bool connectedOnce = false;
     while (true) {
         if (const auto updated = client.update(1); !updated) {
             std::println("Update failed: {}", updated.error().message());
-            break;
+            return 1;
         }
+        if (client.getServerHConn() == lightnerx::network::k_invalidConnection) {
+            std::println("{}", connectedOnce ? "Connection closed" : "Connection attempt failed");
+            return connectedOnce ? 0 : 1;
+        }
+        connectedOnce = connectedOnce || client.isConnected();
+        if (!connectedOnce && std::chrono::steady_clock::now() >= deadline) {
+            std::println("Connection attempt timed out");
+            return 1;
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds{1});
     }
 }
 ```
 
-`connect()` initiates the connection, and `update()` processes network callbacks and available messages. `isConnected()` can be used to query the state observed by the client.
+`connect()` starts an asynchronous attempt. A successful `update()` can process a peer closure and clear the handle. This example exits after closure or after a five-second connection timeout.
 
 ## Execution model
 
