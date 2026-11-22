@@ -383,7 +383,7 @@ void forEach(const Callback& callback) const;
 
 `maxCapacity` limits the number of registered connections and is capped at 65535. `initialReserve` reserves storage for up to that many connections within the configured capacity. A negative constructor argument terminates the process. `add(hConn)` requires an initialized network and a handle recognized by GameNetworkingSockets. It returns the assigned ID, or `std::nullopt` when the network is unavailable, the handle is invalid or already registered, or the manager is at capacity. `remove(id)` unregisters an ID and makes it available for reuse. A missing or out-of-range ID has no effect. Closing the underlying connection is handled by the networking component. The constructor, `add()`, and `remove()` can propagate allocation exceptions. If registration or removal fails during allocation, the existing mappings remain intact.
 
-Copying a manager produces independent registrations. If copy assignment throws, the destination preserves its mappings, count, capacity and ID allocation state. A successful move transfers the registrations and ID allocation state. The source becomes empty, retains its configured maximum capacity and starts assigning IDs at 1 again.
+ConnectionManager is noncopyable and nonmovable. Pass an existing manager by reference.
 
 `getHSteamNetConnection` looks up a handle by its internal ID and returns `k_invalidConnection` when there is no registration for the ID. `getClientId` looks up the ID in this manager's local registration map, independently of GNS userdata or whether the handle has since closed. It returns `std::nullopt` for an absent registration. `getOnlineCount` counts registered handles, including closed ones still registered with this manager.
 

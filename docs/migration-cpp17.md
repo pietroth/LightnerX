@@ -20,7 +20,7 @@ CMake 3.22 or newer and the public `cxx_std_17` requirement replace the experime
 - Parsing still requires one complete frame, rejects truncation and unknown statuses, and preserves the existing extra-byte handling for approved, failure, denied and partially approved responses.
 - Group and broadcast sends attempt every selected destination and return the first send error. On returned send errors, queue flush attempts every entry and returns the error from the last failed entry. Queuing consumes ownership even when rejected. See the [batcher reference](api.md#batcher) for exception behavior.
 - Client and Server remain noncopyable and nonmovable. One wrapper owns networking per LightnerX library instance. Multiple plugins use the same instance when they link to the [shared library](setup.md#consuming-with-cmake).
-- Connection IDs remain 1–65535 with independent mappings, recycling, strong copy assignment and bounded mutation during iteration.
+Connection IDs remain 1–65535 with independent mappings, recycling, and bounded mutation during iteration.
 
 ## Recorded baseline and differential tests
 

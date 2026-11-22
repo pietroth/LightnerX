@@ -31,14 +31,10 @@ namespace lightnerx::network {
         // Capacities must be nonnegative.
         ConnectionManager(int initialReserve, int maxCapacity);
 
-        ConnectionManager(const ConnectionManager&) = default;
-        ConnectionManager(ConnectionManager&& other) noexcept(
-            std::is_nothrow_default_constructible_v<decltype(clients)> &&
-            std::is_nothrow_default_constructible_v<decltype(clientIds)> &&
-            std::is_nothrow_default_constructible_v<decltype(freeIds)>);
-        ConnectionManager& operator=(ConnectionManager&& other) noexcept;
-
-        ConnectionManager& operator=(const ConnectionManager& other);
+        ConnectionManager(const ConnectionManager&) = delete;
+        ConnectionManager& operator=(const ConnectionManager&) = delete;
+        ConnectionManager(ConnectionManager&&) = delete;
+        ConnectionManager& operator=(ConnectionManager&&) = delete;
 
         ConnectionHandle getHSteamNetConnection(std::uint16_t id) const noexcept;
 

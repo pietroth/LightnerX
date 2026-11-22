@@ -19,37 +19,6 @@ ConnectionManager::ConnectionManager(int initialReserve, int maxCapacity) {
     clients.reserve(std::min(initialReserve, this->maxCapacity) + 1);
 }
 
-ConnectionManager::ConnectionManager(ConnectionManager&& other) noexcept(
-    std::is_nothrow_default_constructible_v<decltype(clients)> &&
-    std::is_nothrow_default_constructible_v<decltype(clientIds)> &&
-    std::is_nothrow_default_constructible_v<decltype(freeIds)>) {
-    *this = std::move(other);
-}
-
-ConnectionManager& ConnectionManager::operator=(ConnectionManager&& other) noexcept {
-    if (this != &other) {
-        clients = std::move(other.clients);
-        clientIds = std::move(other.clientIds);
-        maxCapacity = other.maxCapacity;
-        onlineCount = std::exchange(other.onlineCount, 0);
-        freeIds = std::move(other.freeIds);
-        nextId = std::exchange(other.nextId, 1);
-        other.clients.clear();
-        other.clientIds.clear();
-        other.freeIds.clear();
-    }
-    return *this;
-}
-
-ConnectionManager& ConnectionManager::operator=(const ConnectionManager& other) {
-    if (this != &other) {
-        // Copy every allocating member before committing with noexcept move assignment.
-        ConnectionManager replacement(other);
-        *this = std::move(replacement);
-    }
-    return *this;
-}
-
 ConnectionHandle ConnectionManager::getHSteamNetConnection(std::uint16_t id) const noexcept {
     if (id >= clients.size()) {
         return invalidConnection;
@@ -119,4 +88,3 @@ int ConnectionManager::getOnlineCount() const noexcept {
 }
 
 }
-

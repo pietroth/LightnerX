@@ -1,4 +1,4 @@
-foreach(test_name IN ITEMS connection_manager connection_manager_assignment messages lifecycle)
+foreach(test_name IN ITEMS connection_manager messages lifecycle)
     add_executable(lightnerx_test_${test_name} ${test_name}.cpp)
     target_link_libraries(lightnerx_test_${test_name} PRIVATE LightnerX ${lightnerx_gns_target})
     # Keep assertions enabled even in Release/RelWithDebInfo configurations.

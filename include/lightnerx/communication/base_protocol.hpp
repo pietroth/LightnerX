@@ -1,9 +1,7 @@
 #ifndef LIGHTNERX_COMMUNICATION_BASE_PROTOCOL_HPP
 #define LIGHTNERX_COMMUNICATION_BASE_PROTOCOL_HPP
 
-
 #include <cstdint>
-
 
 namespace lightnerx::communication {
     #pragma pack(push, 1)
