@@ -25,8 +25,8 @@ std::array<const void*, 8> producerConstantAddresses() {
             &lightnerx::network::k_invalidPollGroup, &lightnerx::network::invalidConnection};
 }
 
-const void* producerStateAddress() {
-    return &lightnerx::network::g_bNetworkInitialized;
+bool producerNetworkInitialized() {
+    return lightnerx::network::isNetworkInitialized();
 }
 
 bool queueFromProducer() {

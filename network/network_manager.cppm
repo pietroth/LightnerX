@@ -11,9 +11,14 @@ namespace lightnerx::network::detail {
     void (*networkCleanup)() noexcept = nullptr;
 }
 
+namespace lightnerx::network {
+    namespace {
+        bool g_bNetworkInitialized = false;
+    }
+}
+
 export namespace lightnerx::network {
     inline constexpr HSteamNetConnection k_invalidConnection = k_HSteamNetConnection_Invalid;
-    bool g_bNetworkInitialized = false;
 
     bool networkInit() {
         if (g_bNetworkInitialized && SteamNetworkingSockets()) return true;
