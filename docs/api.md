@@ -262,8 +262,6 @@ A single LightnerX library instance allows exactly one started `Client` or `Serv
 
 While a wrapper owns the runtime, `networkKill()` defers shutdown until that owner releases it. The interface remains usable and `isNetworkInitialized()` remains true in the meantime. Direct external `GameNetworkingSockets_Kill()` and raw `RunCallbacks()` during wrapper ownership are unsupported; use LightnerX lifecycle and update operations. Synchronize all network operations across threads in the application.
 
-`g_bNetworkInitialized` is a legacy public flag maintained by LightnerX. Use `isNetworkInitialized()` to query the runtime state and the lifecycle functions to change it.
-
 ## `<lightnerx/network/connection_handle.hpp>`
 
 `lightnerx::network::ConnectionHandle` is an alias for `std::uint32_t`. The same header defines `lightnerx::network::k_invalidConnection` as zero. Use the constant to check whether a handle is absent. These transport handles are distinct from the client IDs assigned by `ConnectionManager`.

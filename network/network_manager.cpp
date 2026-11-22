@@ -9,7 +9,9 @@ namespace lightnerx::network::detail {
 }
 
 namespace lightnerx::network {
-    bool g_bNetworkInitialized = false;
+    namespace {
+        bool g_bNetworkInitialized = false;
+    }
 
     bool networkInit() {
         if (g_bNetworkInitialized && SteamNetworkingSockets()) return true;

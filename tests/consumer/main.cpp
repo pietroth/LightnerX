@@ -8,11 +8,12 @@
 #include <lightnerx/network/transport.hpp>
 #include <lightnerx/network/message_batch.hpp>
 #include <lightnerx/network/connection_manager.hpp>
+#include <lightnerx/network/network_manager.hpp>
 
 static_assert(lightnerx::network::k_invalidConnection == 0);
 static_assert(!std::is_copy_constructible_v<lightnerx::network::Client>);
 
-const void* producerStateAddress();
+bool producerNetworkInitialized();
 std::array<const void*, 8> producerConstantAddresses();
 bool queueFromProducer();
 
@@ -40,8 +41,9 @@ int main() {
     };
     if (producerConstantAddresses() != constants) return 8;
     if (client.getServerHConn() != network::k_invalidConnection) return 1;
-    if (producerStateAddress() != &network::g_bNetworkInitialized) return 2;
+    if (producerNetworkInitialized() || network::isNetworkInitialized()) return 2;
     if (!network::networkInit()) return 3;
+    if (!producerNetworkInitialized() || !network::isNetworkInitialized()) return 12;
     if (!queueFromProducer()) return 4;
     network::ConnectionManager connections(0, 0);
     // The invalid destination proves the other translation unit used this queue.
@@ -49,5 +51,5 @@ int main() {
     if (flushed || flushed.error() != lightnerx::ErrorCode::NotConnected) return 5;
     if (!network::flushAll(connections)) return 6;
     network::networkKill();
-    return network::isNetworkInitialized() ? 7 : 0;
+    return producerNetworkInitialized() || network::isNetworkInitialized() ? 7 : 0;
 }

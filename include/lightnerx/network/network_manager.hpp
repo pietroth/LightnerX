@@ -5,10 +5,6 @@
 #include <lightnerx/network/connection_handle.hpp>
 
 namespace lightnerx::network {
-#if defined(_WIN32) && defined(LIGHTNERX_SHARED) && !defined(LightnerX_EXPORTS)
-    __declspec(dllimport)
-#endif
-    extern bool g_bNetworkInitialized;
     bool networkInit();
     void networkKill();
     bool isNetworkInitialized();
