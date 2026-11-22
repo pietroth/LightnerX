@@ -57,7 +57,7 @@ target_include_directories(LightnerX
 )
 
 target_link_libraries(LightnerX
-    PUBLIC
+    PRIVATE
         ${lightnerx_gns_target}
 )
 if(WIN32)

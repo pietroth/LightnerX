@@ -11,5 +11,5 @@ endif()
 set(LIGHTNERX_BUILD_TESTS OFF CACHE BOOL "" FORCE)
 add_subdirectory("${LIGHTNERX_SOURCE_DIR}" lightnerx)
 add_executable(lightnerx_consumer main.cpp producer.cpp)
-# C++26, Steam headers and linking must all propagate through this target.
+# C++26 and the LightnerX link requirements must propagate through this target.
 target_link_libraries(lightnerx_consumer PRIVATE LightnerX)

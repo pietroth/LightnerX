@@ -1,5 +1,3 @@
-#include <steam/steamnetworkingsockets.h>
-
 import std;
 import lightnerx.network.server;
 import lightnerx.communication.response;
@@ -9,7 +7,7 @@ import lightnerx.network.message_batch;
 import lightnerx.network.connection_manager;
 import lightnerx.network.network_manager;
 
-static_assert(lightnerx::network::k_invalidConnection == k_HSteamNetConnection_Invalid);
+static_assert(lightnerx::network::k_invalidConnection == 0);
 static_assert(!std::is_copy_constructible_v<lightnerx::network::Client>);
 
 bool producerNetworkInitialized();

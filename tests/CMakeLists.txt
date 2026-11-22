@@ -1,6 +1,6 @@
 foreach(test_name IN ITEMS connection_manager connection_manager_assignment messages lifecycle)
     add_executable(lightnerx_test_${test_name} ${test_name}.cpp)
-    target_link_libraries(lightnerx_test_${test_name} PRIVATE LightnerX)
+    target_link_libraries(lightnerx_test_${test_name} PRIVATE LightnerX ${lightnerx_gns_target})
     # Keep assertions enabled even in Release/RelWithDebInfo configurations.
     if(MSVC)
         target_compile_options(lightnerx_test_${test_name} PRIVATE /UNDEBUG)
@@ -13,7 +13,7 @@ endforeach()
 
 find_package(Python3 REQUIRED COMPONENTS Interpreter)
 add_executable(lightnerx_test_characterization characterization.cpp)
-target_link_libraries(lightnerx_test_characterization PRIVATE LightnerX)
+target_link_libraries(lightnerx_test_characterization PRIVATE LightnerX ${lightnerx_gns_target})
 add_test(NAME lightnerx.characterization
     COMMAND ${Python3_EXECUTABLE} "${CMAKE_CURRENT_SOURCE_DIR}/characterization.py"
         "$<TARGET_FILE:lightnerx_test_characterization>"
@@ -148,5 +148,9 @@ foreach(source IN LISTS examples)
     get_filename_component(name "${source}" NAME_WE)
     add_executable(lightnerx_doc_${name} "${source}")
     target_link_libraries(lightnerx_doc_${name} PRIVATE LightnerX)
+    file(STRINGS "${source}" steam_includes REGEX "^#include [<\"]steam/")
+    if(steam_includes)
+        target_link_libraries(lightnerx_doc_${name} PRIVATE ${lightnerx_gns_target})
+    endif()
 endforeach()
 add_test(NAME lightnerx.documentation_setup COMMAND lightnerx_doc_setup_1)

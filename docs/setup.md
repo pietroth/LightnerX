@@ -45,8 +45,11 @@ its static target, configure with `-DBUILD_SHARED_LIB=OFF -DBUILD_STATIC_LIB=ON`
 
 ## Consuming with CMake
 
-The `LightnerX` target propagates C++26, GameNetworkingSockets headers, compile
-definitions and link requirements. Consumers should link only that target.
+The `LightnerX` target propagates C++26 and its link requirements. Applications
+using only LightnerX link `LightnerX`. Examples that include Steam headers or
+use the GameNetworkingSockets API directly also link
+`GameNetworkingSockets::shared` or `GameNetworkingSockets::static`, according to
+the configured GNS variant.
 CMake's experimental `import std` support must be enabled **before the parent
 project's first `project()` call**. This gate is specific to CMake 4.2; consult the
 installed CMake documentation before changing CMake versions.
@@ -64,7 +67,6 @@ target_link_libraries(game PRIVATE LightnerX)
 ```
 
 ```cpp
-#include <steam/steamnetworkingsockets.h>
 import std;
 import lightnerx.network.client;
 
