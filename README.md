@@ -2,6 +2,16 @@
 
 LightnerX is a C++17 library that abstracts client-server networking behind a simple API. It lets applications open and close servers, manage client connections, and exchange messages without calling GameNetworkingSockets directly. It also provides the in-memory message structures and interpreters needed to use the INER semantic protocol.
 
+## ⚠️ Development Notice
+
+LightnerX is currently undergoing an extensive human-led technical review, covering its architecture, implementation, tests, and documentation.
+
+New feature development is temporarily paused while I verify the codebase, address potential inconsistencies, and ensure the library meets my quality standards.
+
+Bug reports and technical feedback remain welcome.
+
+LightnerX was originally designed and developed by a human, with AI coding agents later assisting in code reviews, self-audits, bug fixes, and repetitive tasks during the migration to C++17.
+
 ## Features
 
 - Start and close servers with `Server::start()` and `Server::close()`, and disconnect individual clients with `Server::disconnectConnection()`.
