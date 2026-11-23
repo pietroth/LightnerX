@@ -12,6 +12,10 @@ LightnerX is a C++17 library that abstracts client-server networking behind a si
 > Bug reports and technical feedback remain welcome.
 >
 > LightnerX was originally designed and developed by a human, with AI coding agents later assisting in code reviews, self-audits, bug fixes, and repetitive tasks during the migration to C++17.
+>
+> The main reason for this extensive technical review is the role AI played in writing parts of the codebase. I'm reviewing those contributions to make sure the AI-generated code is correct and works as intended.
+>
+> Going forward, I'll be much more selective about when I use AI in LightnerX, reserving it for cases where it's needed, such as repetitive tasks. Whenever AI contributes code, I'll apply a much stricter review process. I'll personally review every change in detail and rework it as extensively as needed before integrating it into the codebase.
 
 ## Features
 
