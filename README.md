@@ -5,17 +5,13 @@ LightnerX is a C++17 library that abstracts client-server networking behind a si
 > [!WARNING]
 > **Development Notice**
 >
-> LightnerX is currently undergoing an extensive human-led technical review, covering its architecture, implementation, tests, and documentation.
+> LightnerX was conceived, designed in its entirety, and originally developed by humans. After the migration to C++17, the project relied too heavily on AI coding agents to make development easier and faster.
 >
-> New feature development is temporarily paused while I verify the codebase, address potential inconsistencies, and ensure the library meets my quality standards.
+> A comprehensive human-led technical review is now underway to regain direct control over the project's architecture. The review covers the architecture, implementation, tests, and documentation. It will revisit every architectural or design decision that AI may have influenced and verify that AI-generated code works as intended.
 >
-> Bug reports and technical feedback remain welcome.
+> New feature development is temporarily paused during the review. Bug reports and technical feedback remain welcome.
 >
-> LightnerX was originally designed and developed by a human, with AI coding agents later assisting in code reviews, self-audits, bug fixes, and repetitive tasks during the migration to C++17.
->
-> The main reason for this extensive technical review is the role AI played in writing parts of the codebase. I'm reviewing those contributions to make sure the AI-generated code is correct and works as intended.
->
-> Going forward, I'll be much more selective about when I use AI in LightnerX, reserving it for cases where it's needed, such as repetitive tasks. Whenever AI contributes code, I'll apply a much stricter review process. I'll personally review every change in detail and rework it as extensively as needed before integrating it into the codebase.
+> Going forward, LightnerX will use AI much more selectively, reserving it for tasks where assistance is needed, such as repetitive work. Every AI-generated change will undergo a much stricter human review and will be reworked as extensively as needed before it is integrated.
 
 ## Features
 
